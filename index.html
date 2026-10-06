@@ -5,9 +5,15 @@
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 body{margin:0;padding:12px;background:var(--bg);color:var(--text);font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-#bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;color:var(--mute);font-size:12px}
-#gear{background:none;border:0;color:var(--mute);font-size:16px;cursor:pointer;padding:2px 6px}
-#gear:hover{color:var(--text)}
+#bar{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:10px}
+#cats{display:contents}
+#gear{background:#252525;border:1px solid #333;border-radius:8px;color:var(--text);font-size:20px;line-height:1;padding:5px 10px;cursor:pointer}
+#gear:hover{background:#2e2e2e}
+.sep{width:1px;height:20px;background:#333;margin:0 4px}
+.chip{background:transparent;border:1px solid #3a3a3a;border-radius:999px;color:var(--mute);font:inherit;font-size:12.5px;padding:5px 12px;cursor:pointer;white-space:nowrap}
+.chip:hover{color:var(--text);border-color:#555}
+.chip.on{background:rgba(110,168,254,.18);border-color:#6ea8fe;color:#d6e6ff}
+.chip.part{border:1px dashed #6ea8fe;color:#b9d3ff}
 .card{background:var(--card);border-radius:10px;padding:10px 14px;margin-bottom:8px;display:flex;justify-content:space-between;gap:12px;align-items:center}
 .name{font-weight:600}
 .meta{color:var(--mute);font-size:12px}
@@ -21,21 +27,31 @@ a{color:inherit;text-decoration:none}
 #opts{flex:1;overflow-y:auto;columns:2 140px}
 .opt{display:block;padding:3px 0;cursor:pointer;break-inside:avoid}
 .foot{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--mute)}
-#reset{cursor:pointer;text-decoration:underline}
 #done{background:#3a3a3a;color:var(--text);border:0;border-radius:6px;padding:6px 14px;cursor:pointer;font:inherit}
 </style></head><body>
-<div id="bar"><span>Next deadlines</span><button id="gear" title="Choose conferences">⚙</button></div>
+<div id="bar">
+  <button id="gear" title="Choose conferences" aria-label="Choose conferences">⚙</button>
+  <button id="resetBtn" class="chip">Reset filters</button>
+  <span class="sep"></span>
+  <div id="cats"></div>
+</div>
 <div id="list"><div id="msg">Loading…</div></div>
 <div id="panel" hidden>
   <input id="q" placeholder="Search conferences…">
   <div id="opts"></div>
-  <div class="foot"><span id="reset">Reset to default</span><button id="done">Done</button></div>
+  <div class="foot"><span>Changes save automatically</span><button id="done">Done</button></div>
 </div>
 <script>
 // ===== EDIT THESE =====
 const WATCH = ["NeurIPS","ICML","ICLR","CVPR","ICCV","ECCV","WACV","ICASSP","InterSpeech","AAAI"]; // default list
+const CATEGORIES = {                       // buttons in the top bar
+  "ML & AI":        ["NeurIPS","ICML","ICLR","AAAI","AISTATS","IJCAI","UAI"],
+  "Vision":         ["CVPR","ICCV","ECCV","WACV","BMVC","3DV"],
+  "NLP":            ["ACL","EMNLP","NAACL","EACL","COLING","COLM"],
+  "Speech & Audio": ["ICASSP","InterSpeech","ISMIR","WASPAA"]
+};
 const SHOW_PREDICTED = true;   // false hides unconfirmed dates
-const MAX_ROWS = 8;
+const MAX_ROWS = 12;
 const URLS = ["https://mlciv.com/ai-deadlines/conferences.json",
               "https://mlciv.com/ai-deadlines/api/upcoming.json"];
 const STORE_KEY = "deadlineWatch";
@@ -125,8 +141,8 @@ function left(t, withSec){
 }
 function render(){
   const el = $("list");
-  if(!selected.size){ el.innerHTML = '<div id="msg">No conferences selected. Click ⚙ to choose some.</div>'; return; }
-  if(!rows.length){ el.innerHTML = '<div id="msg">No upcoming deadlines found for your list.</div>'; return; }
+  if(!selected.size){ el.innerHTML = '<div id="msg">No conferences selected. Click ⚙ or a category button.</div>'; return; }
+  if(!rows.length){ el.innerHTML = '<div id="msg">No upcoming deadlines found for your selection.</div>'; return; }
   el.innerHTML = rows.map((r,i)=>{
     const days = (r.t - Date.now())/864e5;
     const cls = days < 3 ? "hot" : days < 14 ? "warn" : "";
@@ -140,6 +156,29 @@ function render(){
   }).join("");
 }
 
+// --- category buttons ---
+const catKeys = name => CATEGORIES[name].map(nameOf).filter(k => ALL.has(k));
+function renderBar(){
+  $("cats").innerHTML = Object.keys(CATEGORIES).map(name => {
+    const keys = catKeys(name);
+    const n = keys.filter(k => selected.has(k)).length;
+    const state = keys.length && n === keys.length ? "on" : n > 0 ? "part" : "";
+    const icon = state === "on" ? "✓ " : state === "part" ? "– " : "";
+    return `<button class="chip ${state}" data-cat="${esc(name)}" aria-pressed="${state==="on"}">${icon}${esc(name)}</button>`;
+  }).join("");
+}
+$("cats").onclick = e => {
+  const b = e.target.closest("[data-cat]"); if(!b) return;
+  const keys = catKeys(b.dataset.cat); if(!keys.length) return;
+  const allOn = keys.every(k => selected.has(k));
+  keys.forEach(k => allOn ? selected.delete(k) : selected.add(k));
+  save(); build(); render(); renderBar();
+};
+$("resetBtn").onclick = () => {
+  clearSaved(); selected = new Set(WATCH.map(nameOf));
+  build(); render(); renderBar();
+};
+
 // --- settings panel ---
 function renderOpts(){
   const q = $("q").value.trim().toLowerCase();
@@ -151,21 +190,18 @@ function renderOpts(){
   ).join("") || '<div id="msg">No matches.</div>';
 }
 $("gear").onclick = () => { $("panel").hidden = false; $("q").value = ""; renderOpts(); };
-$("done").onclick = () => { $("panel").hidden = true; };
+$("done").onclick = () => { $("panel").hidden = true; renderBar(); };
 $("q").oninput = renderOpts;
 $("opts").onchange = e => {
   const k = e.target.dataset.k; if(!k) return;
   e.target.checked ? selected.add(k) : selected.delete(k);
-  save(); build(); render();
-};
-$("reset").onclick = () => {
-  clearSaved(); selected = new Set(WATCH.map(nameOf));
-  renderOpts(); build(); render();
+  save(); build(); render(); renderBar();
 };
 
+renderBar();
 load().then(d => {
   DATA = Array.isArray(d) ? d : (d.conferences || Object.values(d).flat());
-  indexNames(); build(); render(); setInterval(render, 1000);
+  indexNames(); build(); render(); renderBar(); setInterval(render, 1000);
 }).catch(() => {
   $("list").innerHTML = '<div id="msg">Could not load deadline data (the source may block cross-site requests).</div>';
 });
