@@ -1,11 +1,14 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
-:root{--bg:#191919;--card:#252525;--text:#e6e6e6;--mute:#9b9b9b;--accent:#6ea8fe;--warn:#f0a35e;--hot:#ff6b6b}
+:root{--bg:#191919;--card:#252525;--text:#e6e6e6;--mute:#9b9b9b;--warn:#f0a35e;--hot:#ff6b6b}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{margin:0;padding:12px;background:var(--bg);color:var(--text);font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+#bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;color:var(--mute);font-size:12px}
+#gear{background:none;border:0;color:var(--mute);font-size:16px;cursor:pointer;padding:2px 6px}
+#gear:hover{color:var(--text)}
 .card{background:var(--card);border-radius:10px;padding:10px 14px;margin-bottom:8px;display:flex;justify-content:space-between;gap:12px;align-items:center}
-.card.top{border:1px solid var(--accent)}
 .name{font-weight:600}
 .meta{color:var(--mute);font-size:12px}
 .count{font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
@@ -13,20 +16,42 @@ body{margin:0;padding:12px;background:var(--bg);color:var(--text);font:14px/1.4 
 a{color:inherit;text-decoration:none}
 .badge{font-size:11px;color:var(--warn);margin-left:6px;font-weight:400}
 #msg{color:var(--mute);padding:8px}
+#panel{position:fixed;inset:8px;background:#202020;border:1px solid #333;border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px;z-index:5}
+#q{width:100%;padding:7px 10px;background:#2b2b2b;border:1px solid #3a3a3a;border-radius:6px;color:var(--text);font:inherit}
+#opts{flex:1;overflow-y:auto;columns:2 140px}
+.opt{display:block;padding:3px 0;cursor:pointer;break-inside:avoid}
+.foot{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--mute)}
+#reset{cursor:pointer;text-decoration:underline}
+#done{background:#3a3a3a;color:var(--text);border:0;border-radius:6px;padding:6px 14px;cursor:pointer;font:inherit}
 </style></head><body>
+<div id="bar"><span>Next deadlines</span><button id="gear" title="Choose conferences">⚙</button></div>
 <div id="list"><div id="msg">Loading…</div></div>
+<div id="panel" hidden>
+  <input id="q" placeholder="Search conferences…">
+  <div id="opts"></div>
+  <div class="foot"><span id="reset">Reset to default</span><button id="done">Done</button></div>
+</div>
 <script>
 // ===== EDIT THESE =====
-const WATCH = ["NeurIPS","ICML","ICLR","CVPR","ICCV","ECCV","WACV","ICASSP","InterSpeech","AAAI"];
+const WATCH = ["NeurIPS","ICML","ICLR","CVPR","ICCV","ECCV","WACV","ICASSP","InterSpeech","AAAI"]; // default list
 const SHOW_PREDICTED = true;   // false hides unconfirmed dates
 const MAX_ROWS = 8;
 const URLS = ["https://mlciv.com/ai-deadlines/conferences.json",
               "https://mlciv.com/ai-deadlines/api/upcoming.json"];
+const STORE_KEY = "deadlineWatch";
 // ======================
 
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const nameOf = s => String(s||"").toLowerCase().replace(/[^a-z]/g,"");
-const watch = new Set(WATCH.map(nameOf));
 
+// --- saved selection (localStorage may be blocked inside embeds) ---
+function loadSaved(){ try{ const v = JSON.parse(localStorage.getItem(STORE_KEY)); return Array.isArray(v) ? v : null; }catch(e){ return null; } }
+function save(){ try{ localStorage.setItem(STORE_KEY, JSON.stringify([...selected])); }catch(e){} }
+function clearSaved(){ try{ localStorage.removeItem(STORE_KEY); }catch(e){} }
+let selected = new Set(loadSaved() || WATCH.map(nameOf));
+
+// --- time handling ---
 function offsetMs(tz, ts){
   const f = new Intl.DateTimeFormat("en-US",{timeZone:tz,hourCycle:"h23",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit"});
   const p = Object.fromEntries(f.formatToParts(new Date(ts)).map(x=>[x.type,x.value]));
@@ -44,6 +69,9 @@ function parseDeadline(str, tz){
   try{ let t = wall - offsetMs(tz, wall); t = wall - offsetMs(tz, t); return t; }
   catch(e){ return wall + 12*36e5; }
 }
+
+// --- data ---
+let DATA = [], ALL = new Map(), rows = [];
 async function load(){
   for(const u of URLS){
     try{ const r = await fetch(u,{cache:"no-store"}); if(r.ok) return await r.json(); }catch(e){}
@@ -61,13 +89,20 @@ function candidates(c){
   (Array.isArray(c.deadline) ? c.deadline : [c.deadline]).forEach(v => add("Paper", v));
   return out;
 }
-let rows = [];
-function build(data){
-  const arr = Array.isArray(data) ? data : (data.conferences || Object.values(data).flat());
-  const now = Date.now(), best = new Map();
-  for(const c of arr){
+function indexNames(){
+  ALL = new Map();
+  const now = Date.now();
+  for(const c of DATA){
     const key = nameOf(c.title || c.id);
-    if(!watch.has(key)) continue;
+    if(!key || ALL.has(key)) continue;
+    if(candidates(c).some(k => k.t > now)) ALL.set(key, String(c.title || c.id));
+  }
+}
+function build(){
+  const now = Date.now(), best = new Map();
+  for(const c of DATA){
+    const key = nameOf(c.title || c.id);
+    if(!selected.has(key)) continue;
     const predicted = /predicted/i.test(c.note||"");
     if(predicted && !SHOW_PREDICTED) continue;
     for(const k of candidates(c)){
@@ -78,29 +113,60 @@ function build(data){
   }
   rows = [...best.values()].sort((a,b)=>a.t-b.t).slice(0, MAX_ROWS);
 }
+
+// --- rendering ---
 function left(t, withSec){
   let s = Math.max(0, Math.floor((t - Date.now())/1000));
   const d = Math.floor(s/86400); s %= 86400;
+  if(d > 30) return `${d} days`;
   const h = Math.floor(s/3600); s %= 3600;
   const m = Math.floor(s/60); s %= 60;
   return `${d}d ${String(h).padStart(2,"0")}h ${String(m).padStart(2,"0")}m` + (withSec ? ` ${String(s).padStart(2,"0")}s` : "");
 }
 function render(){
-  const el = document.getElementById("list");
+  const el = $("list");
+  if(!selected.size){ el.innerHTML = '<div id="msg">No conferences selected. Click ⚙ to choose some.</div>'; return; }
   if(!rows.length){ el.innerHTML = '<div id="msg">No upcoming deadlines found for your list.</div>'; return; }
   el.innerHTML = rows.map((r,i)=>{
     const days = (r.t - Date.now())/864e5;
     const cls = days < 3 ? "hot" : days < 14 ? "warn" : "";
     const when = new Date(r.t).toLocaleString(undefined,{month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"});
-    const name = `${r.c.title||r.c.id} ${r.c.year||""}`;
-    const link = r.c.link ? `<a href="${r.c.link}" target="_blank" rel="noopener">${name}</a>` : name;
-    return `<div class="card ${i===0?"top":""} ${cls}">
+    const name = esc(`${r.c.title||r.c.id} ${r.c.year||""}`);
+    const link = r.c.link ? `<a href="${esc(r.c.link)}" target="_blank" rel="noopener">${name}</a>` : name;
+    return `<div class="card ${cls}">
       <div><div class="name">${link}${r.predicted?'<span class="badge">predicted</span>':""}</div>
       <div class="meta">${r.label} · ${when}</div></div>
       <div class="count">${left(r.t, i===0)}</div></div>`;
   }).join("");
 }
-load().then(d=>{ build(d); render(); setInterval(render, 1000); })
- .catch(()=>{ document.getElementById("list").innerHTML =
-   '<div id="msg">Could not load deadline data (the source may block cross-site requests).</div>'; });
+
+// --- settings panel ---
+function renderOpts(){
+  const q = $("q").value.trim().toLowerCase();
+  const items = [...ALL.entries()]
+    .filter(([k,n]) => !q || n.toLowerCase().includes(q) || k.includes(nameOf(q)))
+    .sort((a,b) => a[1].localeCompare(b[1]));
+  $("opts").innerHTML = items.map(([k,n]) =>
+    `<label class="opt"><input type="checkbox" data-k="${esc(k)}" ${selected.has(k)?"checked":""}> ${esc(n)}</label>`
+  ).join("") || '<div id="msg">No matches.</div>';
+}
+$("gear").onclick = () => { $("panel").hidden = false; $("q").value = ""; renderOpts(); };
+$("done").onclick = () => { $("panel").hidden = true; };
+$("q").oninput = renderOpts;
+$("opts").onchange = e => {
+  const k = e.target.dataset.k; if(!k) return;
+  e.target.checked ? selected.add(k) : selected.delete(k);
+  save(); build(); render();
+};
+$("reset").onclick = () => {
+  clearSaved(); selected = new Set(WATCH.map(nameOf));
+  renderOpts(); build(); render();
+};
+
+load().then(d => {
+  DATA = Array.isArray(d) ? d : (d.conferences || Object.values(d).flat());
+  indexNames(); build(); render(); setInterval(render, 1000);
+}).catch(() => {
+  $("list").innerHTML = '<div id="msg">Could not load deadline data (the source may block cross-site requests).</div>';
+});
 </script></body></html>
