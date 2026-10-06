@@ -1,15 +1,106 @@
 <!doctype html>
-<html><head><meta name="viewport" content="width=device-width,initial-scale=1">
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
-  html,body{margin:0;height:100%;background:#191919;overflow:hidden}
-  .crop{position:relative;width:100%;height:100%;overflow:hidden}
-  iframe{
-    position:absolute; left:0; top:-140px;            /* shift to the part you want */
-    width:166.7%; height:calc(166.7% + 300px);        /* = 1 / 0.6 of the box */
-    border:0; transform:scale(1); transform-origin:0 0;
-    filter:invert(.92) hue-rotate(180deg) contrast(.9);
-  }
+:root{--bg:#191919;--card:#252525;--text:#e6e6e6;--mute:#9b9b9b;--accent:#6ea8fe;--warn:#f0a35e;--hot:#ff6b6b}
+*{box-sizing:border-box}
+body{margin:0;padding:12px;background:var(--bg);color:var(--text);font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.card{background:var(--card);border-radius:10px;padding:10px 14px;margin-bottom:8px;display:flex;justify-content:space-between;gap:12px;align-items:center}
+.card.top{border:1px solid var(--accent)}
+.name{font-weight:600}
+.meta{color:var(--mute);font-size:12px}
+.count{font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+.warn .count{color:var(--warn)} .hot .count{color:var(--hot)}
+a{color:inherit;text-decoration:none}
+.badge{font-size:11px;color:var(--warn);margin-left:6px;font-weight:400}
+#msg{color:var(--mute);padding:8px}
 </style></head><body>
-<div class="crop">
-  <iframe src="https://mlciv.com/ai-deadlines/?sub=ML,CV,SP,DM"></iframe>
-</div></body></html>
+<div id="list"><div id="msg">Loading…</div></div>
+<script>
+// ===== EDIT THESE =====
+const WATCH = ["NeurIPS","ICML","ICLR","CVPR","ICCV","ECCV","WACV","ICASSP","InterSpeech","AAAI"];
+const SHOW_PREDICTED = true;   // false hides unconfirmed dates
+const MAX_ROWS = 8;
+const URLS = ["https://mlciv.com/ai-deadlines/conferences.json",
+              "https://mlciv.com/ai-deadlines/api/upcoming.json"];
+// ======================
+
+const nameOf = s => String(s||"").toLowerCase().replace(/[^a-z]/g,"");
+const watch = new Set(WATCH.map(nameOf));
+
+function offsetMs(tz, ts){
+  const f = new Intl.DateTimeFormat("en-US",{timeZone:tz,hourCycle:"h23",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit"});
+  const p = Object.fromEntries(f.formatToParts(new Date(ts)).map(x=>[x.type,x.value]));
+  return Date.UTC(+p.year,+p.month-1,+p.day,+p.hour,+p.minute,+p.second) - ts;
+}
+function parseDeadline(str, tz){
+  if(!str || /tb[ad]/i.test(str)) return null;
+  const m = String(str).match(/(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?/);
+  if(!m) return null;
+  const wall = Date.UTC(+m[1],+m[2]-1,+m[3],+(m[4]||23),+(m[5]||59),+(m[6]||59));
+  tz = String(tz||"UTC-12").trim();
+  if(/^aoe$/i.test(tz)) return wall + 12*36e5;
+  const u = tz.match(/^(?:UTC|GMT)\s*([+-])\s*(\d{1,2})(?::?(\d{2}))?$/i);
+  if(u) return wall - (u[1]==="-"?-1:1)*(+u[2]*60 + (+u[3]||0))*60e3;
+  try{ let t = wall - offsetMs(tz, wall); t = wall - offsetMs(tz, t); return t; }
+  catch(e){ return wall + 12*36e5; }
+}
+async function load(){
+  for(const u of URLS){
+    try{ const r = await fetch(u,{cache:"no-store"}); if(r.ok) return await r.json(); }catch(e){}
+  }
+  throw new Error("fetch failed");
+}
+function candidates(c){
+  const out = [], tz = c.timezone;
+  const add = (label, v) => {
+    const s = (v && typeof v==="object") ? (v.date||v.deadline) : v;
+    const t = parseDeadline(s, tz);
+    if(t) out.push({label, t});
+  };
+  add("Abstract", c.abstract_deadline);
+  (Array.isArray(c.deadline) ? c.deadline : [c.deadline]).forEach(v => add("Paper", v));
+  return out;
+}
+let rows = [];
+function build(data){
+  const arr = Array.isArray(data) ? data : (data.conferences || Object.values(data).flat());
+  const now = Date.now(), best = new Map();
+  for(const c of arr){
+    const key = nameOf(c.title || c.id);
+    if(!watch.has(key)) continue;
+    const predicted = /predicted/i.test(c.note||"");
+    if(predicted && !SHOW_PREDICTED) continue;
+    for(const k of candidates(c)){
+      if(k.t <= now) continue;
+      const cur = best.get(key);
+      if(!cur || k.t < cur.t) best.set(key, {c, t:k.t, label:k.label, predicted});
+    }
+  }
+  rows = [...best.values()].sort((a,b)=>a.t-b.t).slice(0, MAX_ROWS);
+}
+function left(t, withSec){
+  let s = Math.max(0, Math.floor((t - Date.now())/1000));
+  const d = Math.floor(s/86400); s %= 86400;
+  const h = Math.floor(s/3600); s %= 3600;
+  const m = Math.floor(s/60); s %= 60;
+  return `${d}d ${String(h).padStart(2,"0")}h ${String(m).padStart(2,"0")}m` + (withSec ? ` ${String(s).padStart(2,"0")}s` : "");
+}
+function render(){
+  const el = document.getElementById("list");
+  if(!rows.length){ el.innerHTML = '<div id="msg">No upcoming deadlines found for your list.</div>'; return; }
+  el.innerHTML = rows.map((r,i)=>{
+    const days = (r.t - Date.now())/864e5;
+    const cls = days < 3 ? "hot" : days < 14 ? "warn" : "";
+    const when = new Date(r.t).toLocaleString(undefined,{month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"});
+    const name = `${r.c.title||r.c.id} ${r.c.year||""}`;
+    const link = r.c.link ? `<a href="${r.c.link}" target="_blank" rel="noopener">${name}</a>` : name;
+    return `<div class="card ${i===0?"top":""} ${cls}">
+      <div><div class="name">${link}${r.predicted?'<span class="badge">predicted</span>':""}</div>
+      <div class="meta">${r.label} · ${when}</div></div>
+      <div class="count">${left(r.t, i===0)}</div></div>`;
+  }).join("");
+}
+load().then(d=>{ build(d); render(); setInterval(render, 1000); })
+ .catch(()=>{ document.getElementById("list").innerHTML =
+   '<div id="msg">Could not load deadline data (the source may block cross-site requests).</div>'; });
+</script></body></html>
