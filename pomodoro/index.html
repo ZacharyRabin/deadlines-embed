@@ -46,8 +46,9 @@ body{background:radial-gradient(110% 80% at 50% 36%,color-mix(in srgb,var(--c) 1
 .pill:hover{color:var(--text);border-color:#555}
 .pill.ok{color:#9be3c0;border-color:#2f4a3e}
 .hint{color:var(--mute);font-size:11.5px;text-align:center;max-width:280px}
-#gear{position:absolute;top:8px;right:8px;background:none;border:0;color:var(--mute);font-size:16px;cursor:pointer}
-#gear:hover{color:var(--text)}
+#gear{position:absolute;top:8px;left:8px;width:38px;height:38px;border-radius:50%;background:#222;border:1px solid #333;
+  color:var(--text);font-size:22px;line-height:1;display:grid;place-items:center;cursor:pointer;padding:0;z-index:2;transition:background .2s}
+#gear:hover{background:#2c2c2c}
 #panel{position:absolute;inset:8px;background:#1f1f1f;border:1px solid #333;border-radius:12px;padding:14px;z-index:5;display:flex;flex-direction:column;gap:10px;overflow:auto}
 #panel label{display:flex;justify-content:space-between;align-items:center;gap:10px}
 #panel input[type=number]{width:60px;padding:4px 6px;background:#2b2b2b;border:1px solid #3a3a3a;border-radius:6px;color:var(--text);font:inherit}
@@ -212,7 +213,14 @@ function start(fromUser){
 function pause(){ remaining = Math.max(0,(endAt-Date.now())/1000); running = false; clearTimeout(finishT); render(); }
 function toggle(){ running ? pause() : start(true); }
 function reset(){ running = false; clearTimeout(finishT); remaining = total(); render(); }
-function skip(){ go(mode === "focus" ? "short" : "focus"); }
+function skip(){
+  if(mode === "focus"){
+    stats.cycle++; store.set("pomoStats", stats);   // a skipped focus still advances the cycle (but not the 🍅 count)
+    go(stats.cycle % 4 === 0 ? "long" : "short");
+  } else {
+    go("focus");
+  }
+}
 function finish(){
   if(!running) return;
   running = false; remaining = 0; clearTimeout(finishT);
