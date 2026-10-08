@@ -22,13 +22,13 @@ body{background:radial-gradient(110% 80% at 50% 36%,color-mix(in srgb,var(--c) 1
   :root{--ring:clamp(110px,min(calc(100vh - 100px),40vw),360px)}
   #center{flex-direction:row;gap:28px}
 }
-#ring{position:relative;width:var(--ring);height:var(--ring);cursor:pointer;
+#ring{position:relative;width:var(--ring);height:var(--ring);
   filter:drop-shadow(0 0 18px color-mix(in srgb,var(--c) 28%,transparent))}
 #ring svg{width:100%;height:100%;transform:rotate(-90deg)}
 .track{stroke:#262626}
 .prog{stroke:var(--c);stroke-linecap:round;transition:stroke-dashoffset .25s linear,stroke .4s}
 #inner{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2%}
-#emoji{font-size:calc(var(--ring)*.13);line-height:1}
+#emoji{font-size:calc(var(--ring)*.13);line-height:1;filter:drop-shadow(0 0 .14em color-mix(in srgb,var(--c) 55%,transparent))}
 #time{font-weight:600;font-size:calc(var(--ring)*.21);letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1}
 #label{color:var(--mute);font-size:max(11px,calc(var(--ring)*.055));text-transform:uppercase;letter-spacing:.14em}
 @keyframes pulse{0%{transform:scale(1)}40%{transform:scale(1.05)}100%{transform:scale(1)}}
@@ -47,7 +47,8 @@ body{background:radial-gradient(110% 80% at 50% 36%,color-mix(in srgb,var(--c) 1
 .pill.ok{color:#9be3c0;border-color:#2f4a3e}
 .hint{color:var(--mute);font-size:11.5px;text-align:center;max-width:280px}
 #gear{position:absolute;top:8px;left:8px;width:38px;height:38px;border-radius:50%;background:#222;border:1px solid #333;
-  color:var(--text);font-size:22px;line-height:1;display:grid;place-items:center;cursor:pointer;padding:0;z-index:2;transition:background .2s}
+  color:var(--text);display:grid;place-items:center;cursor:pointer;padding:0;z-index:2;transition:background .2s}
+#gear svg{display:block;width:20px;height:20px}
 #gear:hover{background:#2c2c2c}
 #panel{position:absolute;inset:8px;background:#1f1f1f;border:1px solid #333;border-radius:12px;padding:14px;z-index:5;display:flex;flex-direction:column;gap:10px;overflow:auto}
 #panel label{display:flex;justify-content:space-between;align-items:center;gap:10px}
@@ -57,14 +58,16 @@ body{background:radial-gradient(110% 80% at 50% 36%,color-mix(in srgb,var(--c) 1
 @keyframes fly{from{opacity:1;transform:translate(0,0) rotate(0)}to{opacity:0;transform:translate(var(--dx),var(--dy)) rotate(var(--r))}}
 </style></head><body>
 <div id="app">
-  <button id="gear" title="Settings" aria-label="Settings">⚙</button>
+  <button id="gear" title="Settings" aria-label="Settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+  </button>
   <div id="tabs">
     <button class="tab" data-m="focus">Focus</button>
     <button class="tab" data-m="short">Break</button>
     <button class="tab" data-m="long">Long</button>
   </div>
   <div id="center">
-    <div id="ring" title="Click to start / pause">
+    <div id="ring">
       <svg viewBox="0 0 200 200">
         <circle class="track" cx="100" cy="100" r="88" fill="none" stroke-width="8"/>
         <circle id="prog" class="prog" cx="100" cy="100" r="88" fill="none" stroke-width="8"/>
@@ -98,10 +101,11 @@ const store = {
   get(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } },
   set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
 };
+const FOCUS_EMOJI = "📚";
 const MODES = {
-  focus:{emoji:"🍅", label:"Focus",      color:"#ff8a7a"},
-  short:{emoji:"☕", label:"Break",      color:"#6fe0b5"},
-  long: {emoji:"🌴", label:"Long break", color:"#8aa4ff"}
+  focus:{emoji:FOCUS_EMOJI, label:"Focus",      color:"#ff8a7a"},
+  short:{emoji:"☕",        label:"Break",      color:"#6fe0b5"},
+  long: {emoji:"🌴",        label:"Long break", color:"#8aa4ff"}
 };
 const TIPS = ["Stand up and roll your shoulders.","Look 20 feet away for 20 seconds.","Water time 💧","Stretch your wrists.","Step away from the screen.","Breathe out slowly, three times."];
 const tip = () => TIPS[Math.floor(Math.random()*TIPS.length)];
@@ -113,9 +117,24 @@ let cfg = Object.assign({focus:25, short:5, long:15, auto:false, sound:true, sti
 let stats = store.get("pomoStats") || {};
 const today = new Date().toDateString();
 if(stats.day !== today) stats = {day:today, done:0, cycle:0};
-let mode = "focus", running = false, endAt = 0, remaining = cfg.focus*60, finishT = null, alertTitle = null, lastFav = "";
+let mode = "focus", running = false, endAt = 0, remaining = cfg.focus*60, finishT = null, alertTitle = null, lastFav = "", awayMsg = "";
 const total = () => cfg[mode]*60;
 $("prog").style.strokeDasharray = CIRC;
+
+// --- saved timer state (survives reloads / suspended pages) ---
+// Stored in localStorage, with window.name as a fallback because it survives an iframe reload
+// even when the browser blocks storage inside an embed.
+const SKEY = "pomoState";
+function save(o){
+  o = Object.assign({mode, running, endAt, remaining, t:Date.now()}, o || {});
+  store.set(SKEY, o);
+  try{ window.name = "pomo:" + JSON.stringify(o); }catch(e){}
+}
+function loadSaved(){
+  const found = [store.get(SKEY)];
+  try{ if(String(window.name).startsWith("pomo:")) found.push(JSON.parse(window.name.slice(5))); }catch(e){}
+  return found.filter(o => o && MODES[o.mode]).sort((a,b) => (b.t||0)-(a.t||0))[0] || null;
+}
 
 function render(){
   const m = MODES[mode];
@@ -130,7 +149,7 @@ function render(){
   document.querySelectorAll(".tab").forEach(b => b.classList.toggle("on", b.dataset.m === mode));
   const filled = mode === "long" ? 4 : stats.cycle % 4;
   $("dots").innerHTML = [0,1,2,3].map(i => `<span class="dot ${i<filled?"on":""}"></span>`).join("");
-  $("today").textContent = `${stats.done} 🍅 today`;
+  $("today").textContent = `${stats.done} ${FOCUS_EMOJI} today`;
   document.title = alertTitle || (running ? `${txt} · ${m.emoji} ${m.label}` : "Pomodoro");
   if(lastFav !== m.emoji){ lastFav = m.emoji; $("fav").href = svgIcon(m.emoji); }
 }
@@ -166,7 +185,8 @@ function notify(title, body){
 function renderNotice(){
   const p = permState();
   let html;
-  if(p === "unsupported") html = '<span class="hint">Desktop alerts aren\'t supported in this browser</span>';
+  if(awayMsg) html = `<span class="hint">✅ ${awayMsg}</span>`;
+  else if(p === "unsupported") html = '<span class="hint">Desktop alerts aren\'t supported in this browser</span>';
   else if(p === "granted") html = '<button class="pill ok" data-a="test">🔔 Alerts on · test</button>';
   else if(EMBEDDED) html = '<button class="pill" data-a="pop">↗ Pop out for desktop alerts</button>';
   else if(p === "denied") html = '<span class="hint">Alerts blocked. Allow notifications for this site in your browser settings.</span>';
@@ -181,13 +201,13 @@ $("notice").onclick = e => {
   const a = e.target.dataset.a; if(!a) return;
   if(a === "pop") window.open(location.href.split("#")[0], "pomodoro-popup", "popup=yes,width=360,height=540");
   if(a === "enable") askPerm();
-  if(a === "test") notify("Pomodoro 🍅", "Alerts are working ✅");
+  if(a === "test") notify("Pomodoro " + FOCUS_EMOJI, "Alerts are working ✅");
 };
 
 // --- fun ---
 function celebrate(){
   const r = $("ring"); r.classList.add("done"); setTimeout(()=>r.classList.remove("done"), 1500);
-  const app = $("app"), icons = ["🍅","✨","🎉","⭐"];
+  const app = $("app"), icons = [FOCUS_EMOJI,"✨","🎉","⭐"];
   for(let i=0;i<16;i++){
     const s = document.createElement("span");
     s.className = "conf"; s.textContent = icons[i % icons.length];
@@ -200,7 +220,7 @@ function celebrate(){
 }
 
 // --- timer ---
-function go(m){ mode = m; running = false; clearTimeout(finishT); remaining = total(); render(); }
+function go(m){ mode = m; running = false; clearTimeout(finishT); remaining = total(); save(); render(); }
 function start(fromUser){
   if(fromUser){ initAudio(); askPerm(); }
   if(remaining <= 0) remaining = total();
@@ -208,14 +228,15 @@ function start(fromUser){
   running = true;
   clearTimeout(finishT);
   finishT = setTimeout(finish, remaining*1000 + 30);   // fires even when the tab is in the background
-  render();
+  if(awayMsg){ awayMsg = ""; renderNotice(); }
+  save(); render();
 }
-function pause(){ remaining = Math.max(0,(endAt-Date.now())/1000); running = false; clearTimeout(finishT); render(); }
+function pause(){ remaining = Math.max(0,(endAt-Date.now())/1000); running = false; clearTimeout(finishT); save(); render(); }
 function toggle(){ running ? pause() : start(true); }
-function reset(){ running = false; clearTimeout(finishT); remaining = total(); render(); }
+function reset(){ running = false; clearTimeout(finishT); remaining = total(); save(); render(); }
 function skip(){
   if(mode === "focus"){
-    stats.cycle++; store.set("pomoStats", stats);   // a skipped focus still advances the cycle (but not the 🍅 count)
+    stats.cycle++; store.set("pomoStats", stats);   // a skipped focus still advances the cycle (but not the focus count)
     go(stats.cycle % 4 === 0 ? "long" : "short");
   } else {
     go("focus");
@@ -227,28 +248,28 @@ function finish(){
   const wasFocus = mode === "focus";
   if(wasFocus){ stats.done++; stats.cycle++; store.set("pomoStats", stats); }
   const next = wasFocus ? (stats.cycle % 4 === 0 ? "long" : "short") : "focus";
-  const title = wasFocus ? "Focus complete 🍅" : "Break's over ☕";
+  const title = wasFocus ? "Focus complete " + FOCUS_EMOJI : "Break's over ☕";
   const body = wasFocus ? `${MODES[next].label} next (${cfg[next]} min). ${tip()}` : "Ready for another round?";
   chime(); celebrate(); notify(title, body);
   if(document.hidden) alertTitle = "🔔 " + title;
+  save({mode:next, running:false, endAt:0, remaining:cfg[next]*60});   // a reload during the 1.6s pause lands on the next session
   render();
   setTimeout(() => { go(next); if(cfg.auto) start(false); }, 1600);
 }
-setInterval(() => {
+function tick(){
   if(!running) return;
   remaining = Math.max(0,(endAt-Date.now())/1000);
   if(remaining <= 0) finish();
   render();
-}, 250);
-document.addEventListener("visibilitychange", () => { if(!document.hidden) alertTitle = null; render(); });
+}
+setInterval(tick, 250);
+document.addEventListener("visibilitychange", () => { if(!document.hidden){ alertTitle = null; tick(); } render(); });
+window.addEventListener("pageshow", e => { if(e.persisted) tick(); });
 
-// --- wiring ---
-$("play").onclick = toggle; $("ring").onclick = toggle;
+// --- wiring (play/pause button is the only way to start or pause) ---
+$("play").onclick = toggle;
 $("reset").onclick = reset; $("skip").onclick = skip;
 document.querySelectorAll(".tab").forEach(b => b.onclick = () => go(b.dataset.m));
-document.addEventListener("keydown", e => {
-  if(e.code === "Space" && $("panel").hidden && e.target.tagName !== "INPUT"){ e.preventDefault(); toggle(); }
-});
 
 // --- settings ---
 function fillPanel(){
@@ -261,11 +282,29 @@ function readPanel(){
   cfg.auto = $("fAuto").checked; cfg.sound = $("fSound").checked; cfg.sticky = $("fSticky").checked;
   store.set("pomoCfg", cfg);
   if(!running) remaining = total();
-  render();
+  save(); render();
 }
 ["fFocus","fShort","fLong","fAuto","fSound","fSticky"].forEach(id => $(id).onchange = readPanel);
 $("gear").onclick = () => { fillPanel(); $("panel").hidden = false; };
 $("pdone").onclick = () => { $("panel").hidden = true; };
+
+// --- restore after a reload or suspension ---
+(function restore(){
+  const st = loadSaved(); if(!st) return;
+  mode = st.mode;
+  if(st.running && st.endAt){
+    const left = (st.endAt - Date.now())/1000;
+    if(left > 0){ remaining = left; start(false); return; }
+    // the session ended while the page was away: count it and move to the next one, paused
+    const wasFocus = mode === "focus";
+    if(wasFocus){ stats.done++; stats.cycle++; store.set("pomoStats", stats); }
+    awayMsg = (wasFocus ? "Focus" : "Break") + " finished while the page was away";
+    mode = wasFocus ? (stats.cycle % 4 === 0 ? "long" : "short") : "focus";
+    remaining = total(); running = false; save();
+  } else {
+    remaining = (st.remaining > 0) ? Math.min(st.remaining, total()) : total();
+  }
+})();
 
 render(); renderNotice();
 </script></body></html>
