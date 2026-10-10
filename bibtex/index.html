@@ -1,0 +1,583 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>arXiv to BibTeX</title>
+<style>
+:root{--bg:#171717;--panel:#202020;--panel2:#262626;--line:#333;--text:#ececec;--mute:#8a8a8a;
+  --acc:#8aa4ff;--ok:#6fe0b5;--warn:#ffcf70;--bad:#ff8a7a}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+body{background:radial-gradient(90% 50% at 50% 0%,color-mix(in srgb,var(--acc) 12%,transparent),transparent 70%),var(--bg);min-height:100vh}
+main{max-width:780px;margin:0 auto;padding:28px 16px 60px}
+h1{font-size:22px;margin:0 0 4px;letter-spacing:-.01em}
+h2{font-size:13px;margin:26px 0 8px;color:var(--mute);text-transform:uppercase;letter-spacing:.12em;font-weight:600}
+.sub{color:var(--mute);margin:0 0 18px}
+form{display:flex;gap:8px}
+input[type=text],select{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:10px;font:inherit;padding:10px 12px}
+input[type=text]{flex:1;min-width:0}
+input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+button{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--text);padding:10px 16px}
+button:hover{border-color:#555}
+button.primary{background:var(--acc);border-color:transparent;color:#10131f;font-weight:600}
+button.primary:hover{filter:brightness(1.08)}
+button:disabled{opacity:.55;cursor:default}
+#status{min-height:22px;margin:12px 2px 0;color:var(--mute)}
+#status.err{color:var(--bad)}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:10px;color:var(--mute);font-size:13px}
+.row label{display:flex;align-items:center;gap:6px}
+.row input[type=text]{padding:6px 9px;width:230px;flex:none;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.row select{padding:6px 9px;font-size:13px}
+textarea{width:100%;min-height:210px;resize:vertical;background:var(--panel);border:1px solid var(--line);border-radius:10px;color:var(--text);
+  font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;padding:12px;white-space:pre;overflow:auto}
+.actions{display:flex;align-items:center;gap:12px;margin-top:10px}
+.cand{display:flex;gap:10px;align-items:flex-start;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer}
+.cand.on{border-color:var(--acc)}
+.cand input{margin-top:4px;accent-color:var(--acc)}
+.cand .t{font-weight:600}
+.cand .m{color:var(--mute);font-size:13px}
+.cand .m b{color:var(--text);font-weight:500}
+.warn{background:#2a2418;border:1px solid #4a3d1e;color:var(--warn);border-radius:10px;padding:8px 12px;margin-bottom:8px;font-size:14px}
+.info{background:var(--panel);border:1px solid var(--line);color:var(--mute);border-radius:10px;padding:8px 12px;margin-bottom:8px;font-size:14px}
+details{margin-top:14px;color:var(--mute)}
+summary{cursor:pointer;color:var(--mute)}
+table{border-collapse:collapse;width:100%;margin-top:8px;font-size:13px}
+td,th{border-top:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+th{color:var(--mute);font-weight:500}
+td:nth-child(2){word-break:break-word;color:var(--text)}
+pre{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;white-space:pre-wrap;font:12.5px/1.5 ui-monospace,Menlo,monospace;color:var(--mute)}
+[hidden]{display:none!important}
+@media(max-width:520px){form{flex-direction:column}.row input[type=text]{width:100%}}
+</style></head><body>
+<main>
+  <h1>arXiv to BibTeX</h1>
+  <p class="sub">Paste an arXiv link or ID. It looks up the preprint, finds the published version if there is one, and gives you an entry to paste into your .bib file. Everything runs in your browser.</p>
+  <form id="f">
+    <input id="q" type="text" placeholder="https://arxiv.org/abs/2201.02609" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="arXiv link or ID">
+    <button id="go" class="primary" type="submit">Get BibTeX</button>
+  </form>
+  <div id="status" role="status"></div>
+
+  <section id="result" hidden>
+    <h2>BibTeX</h2>
+    <div class="row">
+      <label>Key <input id="key" type="text" spellcheck="false" autocomplete="off" aria-label="Citation key"></label>
+      <label>Preprint as
+        <select id="optPre"><option value="misc">@misc (eprint fields)</option><option value="article">@article (arXiv preprint)</option></select>
+      </label>
+      <label>Accents
+        <select id="optAcc"><option value="latex">LaTeX macros</option><option value="utf8">Keep UTF-8</option></select>
+      </label>
+    </div>
+    <textarea id="out" spellcheck="false" wrap="off" aria-label="BibTeX output"></textarea>
+    <div class="actions"><button id="copy" class="primary" type="button">Copy BibTeX</button><span id="copied" style="color:var(--ok)"></span></div>
+
+    <h2>Which version are you citing?</h2>
+    <div id="cands"></div>
+    <div id="warns"></div>
+
+    <details><summary>Where each field came from</summary><table id="prov"></table></details>
+  </section>
+
+  <details id="diag"><summary>Connection log</summary><pre id="log"></pre></details>
+  <noscript><p class="warn">This page needs JavaScript.</p></noscript>
+</main>
+
+<script>
+"use strict";
+/* =====================================================================
+   CORE (pure functions; no DOM). Tested in Node with mock responses.
+   ===================================================================== */
+
+// ---------- small text helpers ----------
+const norm = s => String(s == null ? "" : s).normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+const asciiOnly = s => String(s == null ? "" : s).normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9]/g, "");
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function ordinal(n){
+  const s = ["th", "st", "nd", "rd"], v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+// ---------- arXiv ID ----------
+function parseArxivId(input){
+  let s = String(input || "").trim();
+  if(!s) return null;
+  s = s.replace(/10\.48550\/arxiv\./ig, "arxiv:");
+  let m = s.match(/(?:^|[^0-9.])(\d{2})(0[1-9]|1[0-2])\.(\d{4,5})(?:v\d+)?(?![0-9])/);
+  if(m){
+    const ym = +(m[1] + m[2]);                       // IDs up to 1412 have 4-digit numbers, from 1501 on 5 digits
+    const need = ym <= 1412 ? 4 : 5;
+    return (ym >= 704 && m[3].length === need) ? `${m[1]}${m[2]}.${m[3]}` : null;
+  }
+  m = s.match(/(?:^|[^a-z\-])([a-z]+(?:-[a-z]+)?(?:\.[A-Za-z]{2})?\/\d{7})(?:v\d+)?(?![0-9])/i);
+  if(m) return m[1];
+  return null;
+}
+function yearFromArxivId(id){
+  let m = String(id).match(/^(\d{2})(\d{2})\./);
+  if(m) return 2000 + (+m[1]);
+  m = String(id).match(/\/(\d{2})(\d{2})\d{3}$/);
+  if(m){ const yy = +m[1]; return yy >= 91 ? 1900 + yy : 2000 + yy; }
+  return null;
+}
+
+// ---------- names ----------
+const PARTICLES = new Set(["van","von","der","den","de","del","della","di","da","dos","das","du","la","le","ten","ter","bin","ibn","al","el"]);
+function splitName(full){
+  full = String(full || "").replace(/\s+\d{4}$/, "").replace(/\s+/g, " ").trim();   // DBLP disambiguation number
+  if(full.includes(",")){
+    const i = full.indexOf(",");
+    return {last: full.slice(0, i).trim(), first: full.slice(i + 1).trim(), suffix: ""};
+  }
+  const toks = full.split(" ").filter(Boolean);
+  let suffix = "";
+  if(toks.length > 1 && /^(jr\.?|sr\.?|ii|iii|iv)$/i.test(toks[toks.length - 1])) suffix = toks.pop();
+  if(toks.length <= 1) return {last: toks[0] || "", first: "", suffix};
+  let i = toks.length - 1;
+  while(i > 1 && PARTICLES.has(toks[i - 1].toLowerCase())) i--;
+  return {last: toks.slice(i).join(" "), first: toks.slice(0, i).join(" "), suffix};
+}
+function formatAuthor(name){
+  const p = splitName(name);
+  if(!p.first) return "{" + p.last + "}";
+  return p.suffix ? `${p.last}, ${p.suffix}, ${p.first}` : `${p.last}, ${p.first}`;
+}
+
+// ---------- LaTeX encoding ----------
+const COMB = {"\u0300":"`","\u0301":"'","\u0302":"^","\u0303":"~","\u0308":'"',"\u0304":"=","\u0307":"."};
+const COMB_L = {"\u030a":"r","\u0327":"c","\u030c":"v","\u0306":"u","\u030b":"H","\u0328":"k"};
+const SPECIAL = {"ł":"{\\l}","Ł":"{\\L}","ø":"{\\o}","Ø":"{\\O}","ß":"{\\ss}","æ":"{\\ae}","Æ":"{\\AE}","œ":"{\\oe}","Œ":"{\\OE}","ı":"{\\i}"};
+const GREEK = {"α":"alpha","β":"beta","γ":"gamma","δ":"delta","ε":"epsilon","ζ":"zeta","η":"eta","θ":"theta","λ":"lambda","μ":"mu","π":"pi","ρ":"rho","σ":"sigma","τ":"tau","φ":"phi","χ":"chi","ψ":"psi","ω":"omega","Δ":"Delta","Σ":"Sigma","Ω":"Omega","Φ":"Phi","Θ":"Theta","Λ":"Lambda","Π":"Pi","Ψ":"Psi"};
+
+function accentize(s){
+  let out = "";
+  for(const ch of String(s)){
+    if(ch.charCodeAt(0) < 128){ out += ch; continue; }
+    if(SPECIAL[ch]){ out += SPECIAL[ch]; continue; }
+    const d = ch.normalize("NFD");
+    if(d.length === 2){
+      let base = d[0]; const mk = d[1];
+      if(base === "i" || base === "j") base = "\\" + base;
+      if(COMB[mk]){ out += "{\\" + COMB[mk] + base + "}"; continue; }
+      if(COMB_L[mk]){ out += "{\\" + COMB_L[mk] + "{" + base + "}}"; continue; }
+    }
+    out += ch;
+  }
+  return out;
+}
+function typo(s){
+  return s.replace(/[\u2018\u2019]/g, "'").replace(/\u201c/g, "``").replace(/\u201d/g, "''")
+    .replace(/\u2014/g, "---").replace(/[\u2013\u2212]/g, "--").replace(/\u2026/g, "...")
+    .replace(/\u00a0/g, " ").replace(/\u00d7/g, "$\\times$")
+    .replace(/[α-ωΔΣΩΦΘΛΠΨ]/g, c => GREEK[c] ? "$\\" + GREEK[c] + "$" : c);
+}
+// brace words whose capitalisation BibTeX styles would otherwise lower-case (DINO, ViT, ImageNet, 3D ...)
+function protectCaps(s){
+  return s.replace(/[A-Za-z0-9\u00C0-\u024F]+/g, w => {
+    if(/^.+[A-Z]/.test(w)) return "{" + w + "}";          // DINO, ViT, ImageNet, 3D
+    if(/\d/.test(w) && /[A-Z]/.test(w)) return "{" + w + "}";   // A100, V2
+    return w;
+  });
+}
+function tex(s, o){
+  o = o || {};
+  const parts = String(s == null ? "" : s).split(/(\$[^$]*\$)/);
+  let out = parts.map((p, i) => {
+    if(i % 2 === 1) return p;                              // leave $math$ alone
+    if(o.protect) p = protectCaps(p);
+    p = p.replace(/&/g, "\\&").replace(/%/g, "\\%").replace(/#/g, "\\#").replace(/_/g, "\\_")
+         .replace(/\$/g, "\\$").replace(/~/g, "\\textasciitilde{}").replace(/\^/g, "\\textasciicircum{}");
+    return typo(p);
+  }).join("");
+  if(o.accents !== "utf8") out = accentize(out);
+  return out;
+}
+const fixPages = p => String(p || "").trim().replace(/\s*[-\u2013\u2014]+\s*/g, "--");
+
+// ---------- venue table (edit this to change names) ----------
+// full(year) = the booktitle / journal name used in the entry. abbr is kept for a future abbreviation toggle.
+const VENUES = [
+  {id:"cvpr",  kind:"conf", dblp:["conf/cvpr"],  re:/\bcvpr\b|computer vision and pattern recognition/i, abbr:"CVPR", ws:true,
+   full:y => y >= 2019 ? "Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition" : "Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition"},
+  {id:"iccv",  kind:"conf", dblp:["conf/iccv"],  re:/\biccv\b|international conference on computer vision/i, abbr:"ICCV", ws:true,
+   full:y => y >= 2019 ? "Proceedings of the IEEE/CVF International Conference on Computer Vision" : "Proceedings of the IEEE International Conference on Computer Vision"},
+  {id:"eccv",  kind:"conf", dblp:["conf/eccv"],  re:/\beccv\b|european conference on computer vision/i, abbr:"ECCV", ws:true,
+   full:() => "European Conference on Computer Vision"},
+  {id:"wacv",  kind:"conf", dblp:["conf/wacv"],  re:/\bwacv\b|applications of computer vision/i, abbr:"WACV", ws:true,
+   full:y => y >= 2020 ? "Proceedings of the IEEE/CVF Winter Conference on Applications of Computer Vision" : "IEEE Winter Conference on Applications of Computer Vision"},
+  {id:"bmvc",  kind:"conf", dblp:["conf/bmvc"],  re:/\bbmvc\b|british machine vision conference/i, abbr:"BMVC", full:() => "British Machine Vision Conference"},
+  {id:"3dv",   kind:"conf", dblp:["conf/3dim","conf/3dv"], re:/\b3dv\b|international conference on 3d vision/i, abbr:"3DV", full:() => "International Conference on 3D Vision"},
+  {id:"nips",  kind:"conf", dblp:["conf/nips"],  re:/\bneurips\b|\bnips\b|neural information processing systems/i, abbr:"NeurIPS", full:() => "Advances in Neural Information Processing Systems"},
+  {id:"icml",  kind:"conf", dblp:["conf/icml"],  re:/\bicml\b|international conference on machine learning/i, abbr:"ICML",
+   full:y => y >= 2015 ? `Proceedings of the ${ordinal(y - 1983)} International Conference on Machine Learning` : "International Conference on Machine Learning"},
+  {id:"iclr",  kind:"conf", dblp:["conf/iclr"],  re:/\biclr\b|international conference on learning representations/i, abbr:"ICLR", full:() => "International Conference on Learning Representations"},
+  {id:"aaai",  kind:"conf", dblp:["conf/aaai"],  re:/\baaai\b|aaai conference on artificial intelligence/i, abbr:"AAAI", full:() => "Proceedings of the AAAI Conference on Artificial Intelligence"},
+  {id:"ijcai", kind:"conf", dblp:["conf/ijcai"], re:/\bijcai\b|international joint conference on artificial intelligence/i, abbr:"IJCAI", full:() => "International Joint Conference on Artificial Intelligence"},
+  {id:"aistats",kind:"conf",dblp:["conf/aistats"],re:/aistats|artificial intelligence and statistics/i, abbr:"AISTATS", full:() => "International Conference on Artificial Intelligence and Statistics"},
+  {id:"uai",   kind:"conf", dblp:["conf/uai"],   re:/\buai\b|uncertainty in artificial intelligence/i, abbr:"UAI", full:() => "Conference on Uncertainty in Artificial Intelligence"},
+  {id:"acl",   kind:"conf", dblp:["conf/acl"],   re:/^acl\b|annual meeting of the association for computational linguistics/i, abbr:"ACL",
+   full:y => y >= 1963 ? `Proceedings of the ${ordinal(y - 1962)} Annual Meeting of the Association for Computational Linguistics` : "Annual Meeting of the Association for Computational Linguistics"},
+  {id:"emnlp", kind:"conf", dblp:["conf/emnlp"], re:/\bemnlp\b|empirical methods in natural language processing/i, abbr:"EMNLP", full:() => "Proceedings of the Conference on Empirical Methods in Natural Language Processing"},
+  {id:"naacl", kind:"conf", dblp:["conf/naacl"], re:/\bnaacl\b|north american chapter/i, abbr:"NAACL", full:() => "Proceedings of the Conference of the North American Chapter of the Association for Computational Linguistics: Human Language Technologies"},
+  {id:"icassp",kind:"conf", dblp:["conf/icassp"],re:/icassp|acoustics, speech and signal processing/i, abbr:"ICASSP", full:() => "IEEE International Conference on Acoustics, Speech and Signal Processing"},
+  {id:"interspeech",kind:"conf",dblp:["conf/interspeech"],re:/interspeech|international speech communication association/i, abbr:"Interspeech", full:() => "Interspeech"},
+  {id:"mm",    kind:"conf", dblp:["conf/mm"],    re:/acm multimedia|international conference on multimedia/i, abbr:"ACM MM", full:() => "Proceedings of the ACM International Conference on Multimedia"},
+  {id:"kdd",   kind:"conf", dblp:["conf/kdd"],   re:/\bkdd\b|knowledge discovery and data mining/i, abbr:"KDD", full:() => "Proceedings of the ACM SIGKDD International Conference on Knowledge Discovery & Data Mining"},
+  // journals
+  {id:"pami",  kind:"journal", dblp:["journals/pami"], re:/pattern anal|pattern analysis and machine intelligence|\btpami\b/i, abbr:"TPAMI", full:() => "IEEE Transactions on Pattern Analysis and Machine Intelligence"},
+  {id:"ijcv",  kind:"journal", dblp:["journals/ijcv"], re:/int\. j\. comput\. vis|international journal of computer vision|\bijcv\b/i, abbr:"IJCV", full:() => "International Journal of Computer Vision"},
+  {id:"tip",   kind:"journal", dblp:["journals/tip"],  re:/trans\. image process|transactions on image processing/i, abbr:"TIP", full:() => "IEEE Transactions on Image Processing"},
+  {id:"tnnls", kind:"journal", dblp:["journals/tnn"],  re:/neural networks learn|neural networks and learning systems/i, abbr:"TNNLS", full:() => "IEEE Transactions on Neural Networks and Learning Systems"},
+  {id:"tmlr",  kind:"journal", dblp:["journals/tmlr"], re:/trans\. mach\. learn\. res|transactions on machine learning research|\btmlr\b/i, abbr:"TMLR", full:() => "Transactions on Machine Learning Research"},
+  {id:"jmlr",  kind:"journal", dblp:["journals/jmlr"], re:/j\. mach\. learn\. res|journal of machine learning research|\bjmlr\b/i, abbr:"JMLR", full:() => "Journal of Machine Learning Research"},
+  {id:"pr",    kind:"journal", dblp:["journals/pr"],   re:/^pattern recogni/i, abbr:"Pattern Recognit.", full:() => "Pattern Recognition"},
+  {id:"nn",    kind:"journal", dblp:["journals/nn"],   re:/^neural networks$/i, abbr:"Neural Netw.", full:() => "Neural Networks"},
+  {id:"cviu",  kind:"journal", dblp:["journals/cviu"], re:/comput\. vis\. image underst|computer vision and image understanding|\bcviu\b/i, abbr:"CVIU", full:() => "Computer Vision and Image Understanding"},
+  {id:"csur",  kind:"journal", dblp:["journals/csur"], re:/comput\. surv|acm computing surveys/i, abbr:"CSUR", full:() => "ACM Computing Surveys"},
+  {id:"tcsvt", kind:"journal", dblp:["journals/tcsv"], re:/circuits and systems for video technology|circuits syst\. video/i, abbr:"TCSVT", full:() => "IEEE Transactions on Circuits and Systems for Video Technology"},
+  {id:"tmm",   kind:"journal", dblp:["journals/tmm"],  re:/trans\. multim|transactions on multimedia/i, abbr:"TMM", full:() => "IEEE Transactions on Multimedia"},
+  {id:"taslp", kind:"journal", dblp:["journals/taslp"],re:/audio, speech, and language processing|audio speech lang/i, abbr:"TASLP", full:() => "IEEE/ACM Transactions on Audio, Speech, and Language Processing"}
+];
+function matchVenue(dblpKey, raw){
+  const k = String(dblpKey || "").split("/").slice(0, 2).join("/");
+  if(k){ const v = VENUES.find(v => v.dblp.includes(k)); if(v) return v; }
+  const r = String(raw || "");
+  return VENUES.find(v => v.re.test(r)) || null;
+}
+function venueName(c){
+  if(!c.v) return c.venueRaw || "";
+  const n = c.v.full(c.year || 0);
+  return (c.kind === "conf" && c.ws && c.v.ws) ? n + " Workshops" : n;
+}
+
+// ---------- parsing API responses ----------
+function xmlDecode(s){
+  return String(s).replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(+n)).replace(/&amp;/g, "&");
+}
+function parseArxivAtom(xml){
+  const e = String(xml).match(/<entry>([\s\S]*?)<\/entry>/);
+  if(!e) return null;
+  const b = e[1];
+  const one = tag => {
+    const m = b.match(new RegExp("<" + tag + "(?:\\s[^>]*)?>([\\s\\S]*?)</" + tag + ">"));
+    return m ? xmlDecode(m[1]).replace(/\s+/g, " ").trim() : "";
+  };
+  const title = one("title");
+  if(!title || /^error$/i.test(title)) return null;
+  const authors = [...b.matchAll(/<author>[\s\S]*?<name>([\s\S]*?)<\/name>[\s\S]*?<\/author>/g)]
+    .map(m => xmlDecode(m[1]).replace(/\s+/g, " ").trim()).filter(Boolean);
+  const pc = b.match(/<arxiv:primary_category[^>]*\bterm="([^"]+)"/);
+  const published = one("published");
+  return {title, authors, year: published ? +published.slice(0, 4) : null,
+          primaryClass: pc ? pc[1] : "", journalRef: one("arxiv:journal_ref"), doi: one("arxiv:doi")};
+}
+
+// ---------- matching ----------
+function titleSim(a, b){
+  const A = norm(a), B = norm(b);
+  if(!A || !B) return 0;
+  if(A === B) return 1;
+  const SA = new Set(A.split(" ")), SB = new Set(B.split(" "));
+  let inter = 0; SA.forEach(w => { if(SB.has(w)) inter++; });
+  return (2 * inter) / (SA.size + SB.size);
+}
+function lastNames(list){
+  return new Set((list || []).map(a => norm(splitName(a).last).replace(/ /g, "")).filter(Boolean));
+}
+function authorOverlap(a, b){
+  const A = lastNames(a), B = lastNames(b);
+  if(!A.size || !B.size) return 0;
+  let inter = 0; A.forEach(x => { if(B.has(x)) inter++; });
+  return inter / Math.min(A.size, B.size);
+}
+const STOP = new Set(["a","an","the","of","on","in","for","to","and","with","via","from","by","at","towards","toward","is","are","how","what","why","do","does","can","using","use"]);
+function makeKey(authors, year, title){
+  const last = asciiOnly(authors && authors[0] ? splitName(authors[0]).last : "").toLowerCase() || "unknown";
+  const word = norm(title).split(" ").find(w => w && !STOP.has(w)) || "";
+  return `${last}${year || ""}${word}`;
+}
+
+// ---------- candidates ----------
+function candFromDblp(h){
+  const i = (h && h.info) || {};
+  const key = i.key || "", type = i.type || "";
+  if(/^journals\/corr\//.test(key) || /informal/i.test(type)) return null;
+  const isJ = key.startsWith("journals/") || /journal/i.test(type);
+  const isC = key.startsWith("conf/") || /conference/i.test(type);
+  if(!isJ && !isC) return null;
+  const venueRaw = [].concat(i.venue || []).join(", ");
+  const authors = [].concat((i.authors && i.authors.author) || []).map(a => typeof a === "string" ? a : (a && a.text)).filter(Boolean);
+  return {kind: isJ ? "journal" : "conf", source: "DBLP", dblpKey: key,
+    title: String(i.title || "").replace(/\.\s*$/, ""), authors,
+    year: i.year ? +i.year : null, v: matchVenue(key, venueRaw), venueRaw,
+    ws: isC && /workshop/i.test(venueRaw), pages: i.pages || "", volume: i.volume || "", number: i.number || "",
+    doi: i.doi && !/^10\.48550\//.test(i.doi) ? i.doi : ""};
+}
+function candFromS2(meta, s2){
+  if(!s2) return null;
+  const raw = s2.venue || (s2.publicationVenue && s2.publicationVenue.name) || "";
+  if(!raw || /arxiv|\bcorr\b|preprint/i.test(raw)) return null;
+  const v = matchVenue("", raw);
+  const jr = s2.journal || {};
+  const pvType = (s2.publicationVenue && s2.publicationVenue.type) || "";
+  const kind = v ? v.kind : (/journal/i.test(pvType) ? "journal" : "conf");
+  const ids = s2.externalIds || {};
+  const fromJr = !/arxiv/i.test(jr.name || "");
+  return {kind, source: "Semantic Scholar", dblpKey: "", title: s2.title || meta.title,
+    authors: meta.authors,                                   // same paper: keep the arXiv author list for the entry
+    s2Authors: (s2.authors || []).map(a => a && a.name).filter(Boolean), year: s2.year || null, v, venueRaw: raw,
+    ws: /workshop/i.test(raw), pages: fromJr ? (jr.pages || "") : "", volume: fromJr ? (jr.volume || "") : "", number: "",
+    doi: ids.DOI && !/^10\.48550\//.test(ids.DOI) ? ids.DOI : ""};
+}
+function buildCandidates(meta, s2, dblp){
+  const s2Dblp = (s2 && s2.externalIds && s2.externalIds.DBLP) || "";
+  let list = [];
+  for(const h of (dblp && dblp.hits) || []){ const c = candFromDblp(h); if(c) list.push(c); }
+  const sc = candFromS2(meta, s2); if(sc) list.push(sc);
+  for(const c of list){
+    c.ts = titleSim(meta.title, c.title);
+    c.ov = authorOverlap(meta.authors, c.s2Authors || c.authors);
+    c.score = 0.7 * c.ts + 0.3 * c.ov + (c.dblpKey && c.dblpKey === s2Dblp ? 0.5 : 0);
+    c.name = venueName(c);
+    c.good = c.ts >= 0.85 && c.ov >= 0.5;
+  }
+  list = list.filter(c => c.ts >= 0.5 && c.ov >= 0.2);     // drop clear non-matches
+  // an S2-only candidate is redundant if DBLP already found the same venue
+  list = list.filter(c => !(c.source === "Semantic Scholar" && list.some(d => d.source === "DBLP" && d.good && d.v && c.v && d.v.id === c.v.id)));
+  list.sort((a, b) => b.score - a.score);
+  list = list.slice(0, 6);
+  list.push({kind: "preprint", source: "arXiv", title: meta.title, authors: meta.authors, year: meta.year, name: "", good: true, ts: 1, ov: 1, score: 0});
+  return list;
+}
+function defaultSelection(cands){
+  const i = cands.findIndex(c => c.kind !== "preprint" && c.good);
+  return i >= 0 ? i : cands.length - 1;
+}
+
+// ---------- output ----------
+function buildBib(meta, c, key, opts){
+  const T = (s, o) => tex(s, Object.assign({accents: opts.accents}, o || {}));
+  const lines = [];
+  const add = (k, v) => { if(v !== undefined && v !== null && String(v).trim() !== "") lines.push(`  ${k}={${v}}`); };
+  const authors = (c.kind !== "preprint" && c.authors && c.authors.length) ? c.authors : meta.authors;
+  const authorStr = authors.map(a => T(formatAuthor(a))).join(" and ");
+  let type;
+  if(c.kind === "conf"){
+    type = "inproceedings";
+    add("title", T(c.title, {protect: true})); add("author", authorStr); add("booktitle", T(venueName(c)));
+    add("pages", fixPages(c.pages)); add("year", c.year); add("doi", c.doi);
+  } else if(c.kind === "journal"){
+    type = "article";
+    add("title", T(c.title, {protect: true})); add("author", authorStr); add("journal", T(venueName(c)));
+    add("volume", T(c.volume)); add("number", T(c.number)); add("pages", fixPages(c.pages)); add("year", c.year); add("doi", c.doi);
+  } else if(opts.preprint === "article"){
+    type = "article";
+    add("title", T(meta.title, {protect: true})); add("author", authorStr);
+    add("journal", `arXiv preprint arXiv:${meta.id}`); add("year", meta.year);
+  } else {
+    type = "misc";
+    add("title", T(meta.title, {protect: true})); add("author", authorStr); add("year", meta.year);
+    add("eprint", meta.id); add("archivePrefix", "arXiv"); add("primaryClass", meta.primaryClass);
+  }
+  return `@${type}{${key},\n${lines.join(",\n")}\n}`;
+}
+function keyFor(meta, c){
+  const preprint = c.kind === "preprint";
+  return makeKey(preprint ? meta.authors : (c.authors.length ? c.authors : meta.authors),
+                 preprint ? meta.year : c.year, preprint ? meta.title : c.title);
+}
+function warningsFor(meta, c, ctx){
+  const w = [];
+  if(c.kind === "preprint"){
+    if(ctx.dblpFailed && ctx.s2Failed) w.push("Couldn't reach DBLP or Semantic Scholar from this browser, so I can't tell whether a published version exists. Check the connection log.");
+    else if(ctx.dblpFailed) w.push("DBLP couldn't be reached from this browser, so a published version may exist that wasn't found. See the connection log.");
+    else if(ctx.anyPublished) w.push("Possible published versions are listed above, but none matched the arXiv title and authors closely enough to pick automatically. If one of them is your paper, select it.");
+    else w.push("No published version found. If this paper was published, it may be too new for DBLP, or the title changed. Check the paper's page.");
+    if(meta.journalRef) w.push(`The authors' arXiv entry lists: "${meta.journalRef}". If that's what you're citing, none of the published matches above were found automatically.`);
+    return w;
+  }
+  if(c.ts < 1) w.push(`The published title differs from the arXiv title. The entry uses: "${c.title}".`);
+  if(c.ov < 0.8) w.push("The author lists don't fully agree between arXiv and the published record. Check the authors.");
+  if(!c.v) w.push(`I don't have a full name for the venue "${c.venueRaw}", so it is used as written. Check it, or add it to the venue table in the page source.`);
+  if(c.ws && c.v && !c.v.ws) w.push("This looks like a workshop paper. Check that the booktitle is right.");
+  if(/findings/i.test(c.venueRaw)) w.push("This looks like a Findings paper, which has its own proceedings title. Check the booktitle.");
+  if(c.source === "Semantic Scholar") w.push("Venue and year come from Semantic Scholar only" + (ctx.dblpFailed ? " (DBLP couldn't be reached from this browser, so there are no page numbers)" : " (no page numbers)") + ". Check them against the paper's page.");
+  if(c.year && meta.year && Math.abs(c.year - meta.year) > 2) w.push(`The published year (${c.year}) is far from the arXiv year (${meta.year}). Check that this is the right paper.`);
+  if(ctx.nStrong > 1) w.push("More than one published record matches (for example a conference paper and a journal extension). Make sure you picked the right one.");
+  return w;
+}
+function provenance(meta, c){
+  const rows = [];
+  if(c.kind === "preprint"){
+    rows.push(["Title", meta.title, meta.src], ["Authors", meta.authors.join("; "), meta.src], ["Year", meta.year, "arXiv ID / submission date"],
+              ["arXiv ID", meta.id, "your input"]);
+    if(meta.primaryClass) rows.push(["Category", meta.primaryClass, meta.src]);
+  } else {
+    rows.push(["Title", c.title, c.source], ["Authors", c.authors.join("; "), c.source],
+              ["Venue", venueName(c) + (c.v ? "  (name from the page's venue table)" : "  (as written by the source)"), c.source],
+              ["Year", c.year, c.source]);
+    if(c.pages) rows.push(["Pages", c.pages, c.source]);
+    if(c.volume) rows.push(["Volume / number", c.volume + (c.number ? " / " + c.number : ""), c.source]);
+    if(c.doi) rows.push(["DOI", c.doi, c.source]);
+  }
+  rows.push(["Citation key", "", "generated from first author, year, first title word"]);
+  return rows;
+}
+
+// ---------- network orchestration (fetcher is injectable for tests) ----------
+function makeCaller(fetcher, log){
+  return async function call(name, url, o){
+    o = o || {};
+    for(let attempt = 0; attempt < 2; attempt++){
+      const t0 = Date.now();
+      try{
+        const r = await fetcher(url);
+        const ms = Date.now() - t0;
+        if(r.status === 429 && o.retry429 && attempt === 0){ log(`${name}: rate limited (429), retrying once…`); await sleep(1500); continue; }
+        if(r.ok){ log(`OK    ${name}: ${r.status} in ${ms} ms`); return r; }
+        log(`FAIL  ${name}: HTTP ${r.status}`); return null;
+      }catch(e){
+        log(`FAIL  ${name}: ${e && e.name === "AbortError" ? "timed out" : "request failed (blocked by the browser's cross-site rules, offline, or the service is down)"}`);
+        return null;
+      }
+    }
+    return null;
+  };
+}
+async function searchDblp(title, call){
+  const words = norm(title).split(" ").filter(Boolean);
+  for(const n of [12, 6]){
+    const q = words.slice(0, n).join(" ");
+    if(!q) continue;
+    const r = await call("DBLP", "https://dblp.org/search/publ/api?q=" + encodeURIComponent(q) + "&format=json&h=25");
+    if(!r) return {failed: true, hits: []};
+    let hits = [];
+    try{ const j = JSON.parse(r.text); hits = [].concat((j.result && j.result.hits && j.result.hits.hit) || []); }catch(e){}
+    if(hits.length) return {failed: false, hits};
+  }
+  return {failed: false, hits: []};
+}
+async function lookup(id, fetcher, log){
+  const call = makeCaller(fetcher, log);
+  const S2F = "title,year,venue,publicationVenue,externalIds,authors.name,journal";
+  const [axr, s2r] = await Promise.all([
+    call("arXiv API", `https://export.arxiv.org/api/query?id_list=${id}&max_results=1`),
+    call("Semantic Scholar", `https://api.semanticscholar.org/graph/v1/paper/ARXIV:${id}?fields=${S2F}`, {retry429: true})
+  ]);
+  const ax = axr ? parseArxivAtom(axr.text) : null;
+  let s2 = null;
+  if(s2r){ try{ s2 = JSON.parse(s2r.text); }catch(e){} if(s2 && !s2.title) s2 = null; }
+  if(!ax && !s2) throw new Error("Couldn't fetch this paper's details from arXiv or Semantic Scholar. See the connection log below.");
+  const meta = ax
+    ? {id, title: ax.title, authors: ax.authors, year: yearFromArxivId(id) || ax.year, primaryClass: ax.primaryClass, journalRef: ax.journalRef, src: "arXiv API"}
+    : {id, title: s2.title, authors: (s2.authors || []).map(a => a.name).filter(Boolean), year: yearFromArxivId(id) || s2.year, primaryClass: "", journalRef: "", src: "Semantic Scholar"};
+  const dblp = await searchDblp(meta.title, call);
+  const cands = buildCandidates(meta, s2, dblp);
+  const published = cands.filter(c => c.kind !== "preprint");
+  return {meta, cands, sel: defaultSelection(cands),
+          ctx: {dblpFailed: dblp.failed, s2Failed: !s2, anyPublished: published.length > 0, nStrong: published.filter(c => c.good).length}};
+}
+
+if(typeof globalThis !== "undefined"){
+  globalThis.__bib = {parseArxivId, yearFromArxivId, splitName, formatAuthor, tex, accentize, protectCaps, fixPages, matchVenue, venueName,
+    parseArxivAtom, titleSim, authorOverlap, makeKey, candFromDblp, candFromS2, buildCandidates, defaultSelection, buildBib, keyFor,
+    warningsFor, provenance, lookup, ordinal, VENUES};
+}
+
+/* =====================================================================
+   UI
+   ===================================================================== */
+if(typeof document !== "undefined"){
+  const $ = id => document.getElementById(id);
+  const h = (tag, props, ...kids) => {
+    const el = document.createElement(tag);
+    Object.entries(props || {}).forEach(([k, v]) => { if(k === "class") el.className = v; else el.setAttribute(k, v); });
+    kids.flat().forEach(k => { if(k === null || k === undefined || k === false) return; el.append(k instanceof Node ? k : document.createTextNode(String(k))); });
+    return el;
+  };
+  const store = {
+    get(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } },
+    set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+  };
+  const opts = Object.assign({preprint: "misc", accents: "latex"}, store.get("bibOpts") || {});
+  let R = null;            // current lookup result
+  let keyEdited = false;
+  let logLines = [];
+  const log = line => { logLines.push(line); $("log").textContent = logLines.join("\n"); };
+
+  function browserFetcher(timeout){
+    return async url => {
+      const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), timeout || 12000);
+      try{ const r = await fetch(url, {signal: ctl.signal}); const text = await r.text(); return {ok: r.ok, status: r.status, text}; }
+      finally{ clearTimeout(to); }
+    };
+  }
+  function setStatus(msg, err){ const s = $("status"); s.textContent = msg || ""; s.className = err ? "err" : ""; }
+
+  function render(){
+    if(!R) return;
+    const c = R.cands[R.sel];
+    if(!keyEdited) $("key").value = keyFor(R.meta, c);
+    $("out").value = buildBib(R.meta, c, $("key").value.trim() || keyFor(R.meta, c), opts);
+
+    const box = $("cands"); box.textContent = "";
+    R.cands.forEach((cd, i) => {
+      const preprint = cd.kind === "preprint";
+      const label = preprint ? "arXiv preprint" : `${cd.v ? cd.v.abbr : cd.venueRaw}${cd.ws ? " Workshops" : ""} ${cd.year || ""}`.trim();
+      const meta2 = preprint ? "Use this if you're citing the preprint itself, or nothing published was found."
+        : [h("b", {}, cd.source), ` · title match ${Math.round(cd.ts * 100)}% · author match ${Math.round(cd.ov * 100)}%`, cd.pages ? ` · pages ${cd.pages}` : ""];
+      const radio = h("input", {type: "radio", name: "cand"}); radio.checked = i === R.sel;
+      const row = h("label", {class: "cand" + (i === R.sel ? " on" : "")}, radio,
+        h("div", {}, h("div", {class: "t"}, label), preprint ? null : h("div", {class: "m"}, cd.title), h("div", {class: "m"}, meta2)));
+      radio.addEventListener("change", () => { R.sel = i; render(); });
+      box.append(row);
+    });
+
+    const wb = $("warns"); wb.textContent = "";
+    warningsFor(R.meta, c, R.ctx).forEach(t => wb.append(h("div", {class: "warn"}, t)));
+
+    const pt = $("prov"); pt.textContent = "";
+    pt.append(h("tr", {}, h("th", {}, "Field"), h("th", {}, "Value"), h("th", {}, "Source")));
+    provenance(R.meta, c).forEach(r => pt.append(h("tr", {}, h("td", {}, r[0]), h("td", {}, r[1] == null ? "" : r[1]), h("td", {}, r[2]))));
+  }
+
+  async function run(input){
+    const id = parseArxivId(input);
+    $("result").hidden = true; $("copied").textContent = "";
+    logLines = []; $("log").textContent = "";
+    if(!id){ setStatus("Couldn't find an arXiv ID in that. Try a link like https://arxiv.org/abs/2201.02609 or just 2201.02609.", true); return; }
+    $("go").disabled = true; setStatus(`Looking up arXiv:${id} …`);
+    try{
+      R = await lookup(id, browserFetcher(12000), log);
+      keyEdited = false;
+      $("result").hidden = false;
+      const pub = R.cands[R.sel].kind !== "preprint";
+      setStatus(pub ? "Found a published version. Check it below before you copy." : "Using the arXiv preprint. See below for details.");
+      render();
+    }catch(e){
+      R = null; setStatus(e.message || "Something went wrong.", true);
+      $("diag").open = true;
+    }finally{ $("go").disabled = false; }
+  }
+
+  $("f").addEventListener("submit", e => { e.preventDefault(); run($("q").value); });
+  $("key").addEventListener("input", () => { keyEdited = true; render(); });
+  $("optPre").value = opts.preprint; $("optAcc").value = opts.accents;
+  $("optPre").addEventListener("change", () => { opts.preprint = $("optPre").value; store.set("bibOpts", opts); render(); });
+  $("optAcc").addEventListener("change", () => { opts.accents = $("optAcc").value; store.set("bibOpts", opts); render(); });
+  $("copy").addEventListener("click", async () => {
+    const t = $("out").value; let ok = false;
+    try{ await navigator.clipboard.writeText(t); ok = true; }
+    catch(e){ $("out").select(); try{ ok = document.execCommand("copy"); }catch(_){} }
+    $("copied").textContent = ok ? "Copied" : "Couldn't copy. Select the text and copy it manually.";
+    setTimeout(() => { $("copied").textContent = ""; }, 2500);
+  });
+
+  const qs = new URLSearchParams(location.search).get("q");
+  if(qs){ $("q").value = qs; run(qs); }
+}
+</script>
+</body></html>
