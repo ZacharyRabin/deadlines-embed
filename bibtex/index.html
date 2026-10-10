@@ -46,40 +46,76 @@ td,th{border-top:1px solid var(--line);padding:6px 8px;text-align:left;vertical-
 th{color:var(--mute);font-weight:500}
 td:nth-child(2){word-break:break-word;color:var(--text)}
 pre{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;white-space:pre-wrap;font:12.5px/1.5 ui-monospace,Menlo,monospace;color:var(--mute)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 0}
+.chip{font-size:12.5px;border:1px solid var(--line);background:var(--panel);color:var(--mute);border-radius:999px;padding:3px 10px}
+.chip.ok{color:var(--ok)}.chip.bad{color:var(--warn);border-color:#4a3d1e}
+.tabs{display:flex;gap:6px;margin-bottom:14px}
+.tabs button{padding:7px 14px;font-size:14px}
+.tabs button.on{background:var(--acc);border-color:transparent;color:#10131f;font-weight:600}
+.opts{margin-bottom:14px}
+#q,#fin{min-height:0}
+#q{height:96px;min-height:70px}
+#fin{height:200px}
+form{flex-direction:column;gap:0}
+.item{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-bottom:8px;padding:0 12px}
+.item>summary{padding:10px 0;color:var(--text);list-style-position:outside}
+.item .sum-m{color:var(--mute);font-size:13px}
+.badge{font-size:12px;border-radius:999px;padding:1px 8px;margin-left:6px;background:#2a2418;color:var(--warn);border:1px solid #4a3d1e}
+.badge.bad{background:#2a1c1c;color:var(--bad);border-color:#4d2b2b}
+.item .body{padding:0 0 12px}
+.item .cand{background:var(--bg)}
+.keyrow{display:flex;gap:8px;align-items:center;margin:8px 0;color:var(--mute);font-size:13px}
+.keyrow input{width:240px;flex:none;padding:6px 9px;font:13px ui-monospace,Menlo,monospace}
+.rep ul{margin:6px 0 0;padding-left:20px;color:var(--mute);font-size:13px}
 [hidden]{display:none!important}
 @media(max-width:520px){form{flex-direction:column}.row input[type=text]{width:100%}}
 </style></head><body>
 <main>
   <h1>arXiv to BibTeX</h1>
-  <p class="sub">Paste an arXiv link or ID. It looks up the preprint, finds the published version if there is one, and gives you an entry to paste into your .bib file. Everything runs in your browser.</p>
-  <form id="f">
-    <input id="q" type="text" placeholder="https://arxiv.org/abs/2201.02609" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="arXiv link or ID">
-    <button id="go" class="primary" type="submit">Get BibTeX</button>
-  </form>
-  <div id="status" role="status"></div>
+  <p class="sub">Look up arXiv papers (one link per line) or reformat an existing .bib file. Everything runs in your browser.</p>
+  <nav class="tabs" role="tablist"><button type="button" data-tab="lookup" class="on">Look up arXiv</button><button type="button" data-tab="fmt">Reformat .bib</button></nav>
+  <div class="row opts">
+    <label>Venue names
+      <select id="optVen"><option value="full">Full titles</option><option value="abbr">Abbreviations</option></select>
+    </label>
+    <label class="lk">Citation key
+      <select id="optKey"><option value="short_year">Short name + year</option><option value="short">Short name</option><option value="full">Full title (CamelCase)</option><option value="author">Author + year + word</option></select>
+    </label>
+    <label class="lk">Preprint as
+      <select id="optPre"><option value="misc">@misc (eprint fields)</option><option value="article">@article (arXiv preprint)</option></select>
+    </label>
+    <label>Accents
+      <select id="optAcc"><option value="latex">LaTeX macros</option><option value="utf8">Keep UTF-8</option></select>
+    </label>
+  </div>
 
-  <section id="result" hidden>
-    <h2>BibTeX</h2>
-    <div class="row">
-      <label>Key <input id="key" type="text" spellcheck="false" autocomplete="off" aria-label="Citation key"></label>
-      <label>Preprint as
-        <select id="optPre"><option value="misc">@misc (eprint fields)</option><option value="article">@article (arXiv preprint)</option></select>
-      </label>
-      <label>Accents
-        <select id="optAcc"><option value="latex">LaTeX macros</option><option value="utf8">Keep UTF-8</option></select>
-      </label>
-    </div>
-    <textarea id="out" spellcheck="false" wrap="off" aria-label="BibTeX output"></textarea>
-    <div class="actions"><button id="copy" class="primary" type="button">Copy BibTeX</button><span id="copied" style="color:var(--ok)"></span></div>
+  <section id="tabLookup">
+    <form id="f">
+      <textarea id="q" rows="3" placeholder="https://arxiv.org/abs/2201.02609&#10;2103.14030&#10;(one link or ID per line)" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="arXiv links or IDs, one per line"></textarea>
+      <div class="actions"><button id="go" class="primary" type="submit">Get BibTeX</button></div>
+    </form>
+    <div id="status" role="status"></div>
+    <div id="chips" class="chips" hidden></div>
 
-    <h2>Which version are you citing?</h2>
-    <div id="cands"></div>
-    <div id="warns"></div>
+    <section id="result" hidden>
+      <h2>BibTeX</h2>
+      <textarea id="out" spellcheck="false" wrap="off" aria-label="BibTeX output"></textarea>
+      <div class="actions"><button id="copy" class="primary" type="button">Copy BibTeX</button><span id="copied" style="color:var(--ok)"></span></div>
+      <h2 id="itemsHead">Check each paper</h2>
+      <div id="items"></div>
+    </section>
 
-    <details><summary>Where each field came from</summary><table id="prov"></table></details>
+    <details id="diag"><summary>Connection log</summary><pre id="log"></pre></details>
   </section>
 
-  <details id="diag"><summary>Connection log</summary><pre id="log"></pre></details>
+  <section id="tabFmt" hidden>
+    <textarea id="fin" spellcheck="false" wrap="off" placeholder="Paste a .bib file or a few entries here" aria-label="BibTeX input"></textarea>
+    <div class="actions"><button id="fgo" class="primary" type="button">Reformat</button><span id="fstat" style="color:var(--mute)"></span></div>
+    <div id="freport"></div>
+    <h2>Result</h2>
+    <textarea id="fout" spellcheck="false" wrap="off" aria-label="Reformatted BibTeX"></textarea>
+    <div class="actions"><button id="fcopy" class="primary" type="button">Copy</button><span id="fcopied" style="color:var(--ok)"></span></div>
+  </section>
   <noscript><p class="warn">This page needs JavaScript.</p></noscript>
 </main>
 
@@ -239,16 +275,127 @@ const VENUES = [
   {id:"tmm",   kind:"journal", dblp:["journals/tmm"],  re:/trans\. multim|transactions on multimedia/i, abbr:"TMM", full:() => "IEEE Transactions on Multimedia"},
   {id:"taslp", kind:"journal", dblp:["journals/taslp"],re:/audio, speech, and language processing|audio speech lang/i, abbr:"TASLP", full:() => "IEEE/ACM Transactions on Audio, Speech, and Language Processing"}
 ];
+// ISO-style abbreviations for journals (conference abbreviations are the usual acronyms). Short forms stay recognised as alternates.
+const ISO = {pami:"IEEE Trans. Pattern Anal. Mach. Intell.", ijcv:"Int. J. Comput. Vis.", tip:"IEEE Trans. Image Process.", tnnls:"IEEE Trans. Neural Netw. Learn. Syst.",
+  tmlr:"Trans. Mach. Learn. Res.", jmlr:"J. Mach. Learn. Res.", pr:"Pattern Recognit.", nn:"Neural Netw.", cviu:"Comput. Vis. Image Underst.", csur:"ACM Comput. Surv.",
+  tcsvt:"IEEE Trans. Circuits Syst. Video Technol.", tmm:"IEEE Trans. Multimedia", taslp:"IEEE/ACM Trans. Audio, Speech, Lang. Process."};
+const ALTS = {
+  cvpr:["Proc. IEEE Conf. Comput. Vis. Pattern Recognit.","IEEE Conf. Comput. Vis. Pattern Recognit.","Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit."],
+  iccv:["Proc. IEEE Int. Conf. Comput. Vis.","Proc. IEEE/CVF Int. Conf. Comput. Vis.","Int. Conf. Comput. Vis."],
+  eccv:["Eur. Conf. Comput. Vis."], wacv:["Proc. IEEE Winter Conf. Appl. Comput. Vis.","IEEE Winter Conf. Appl. Comput. Vis."],
+  nips:["NIPS","Adv. Neural Inf. Process. Syst.","Neural Information Processing Systems"], icml:["Int. Conf. Mach. Learn."], iclr:["Int. Conf. Learn. Represent."],
+  mm:["ACM Multimedia","MM","ACM MM"], kdd:["SIGKDD","ACM SIGKDD"], aaai:["AAAI Conf. Artif. Intell."], ijcai:["Int. Joint Conf. Artif. Intell."],
+  acl:["Annu. Meet. Assoc. Comput. Linguist."], emnlp:["Empirical Methods in Natural Language Processing"],
+  pami:["TPAMI","PAMI","IEEE TPAMI"], ijcv:["IJCV"], tip:["IEEE TIP"], tnnls:["IEEE TNNLS","TNNLS"], tmlr:["TMLR"], jmlr:["JMLR"], cviu:["CVIU"],
+  csur:["ACM CSUR"], tcsvt:["IEEE TCSVT"], tmm:["IEEE TMM"], taslp:["IEEE/ACM TASLP","TASLP"]};
+VENUES.forEach(v => { v.alts = (ALTS[v.id] || []).slice(); if(ISO[v.id]){ v.alts.push(v.abbr); v.abbr = ISO[v.id]; } });
+function styleName(v, year, ws, style){
+  const n = style === "abbr" ? v.abbr : v.full(year || 0);
+  return ws ? n + " Workshops" : n;
+}
+const CANON_DROP = new Set(["proceedings","proc","of","the","and","ieee","cvf","acm","in","workshop","workshops"]);
+function canon(s){
+  return norm(String(s).replace(/\([^)]*\)/g, " ")).split(" ")
+    .filter(w => w && !CANON_DROP.has(w) && !/^\d+$/.test(w) && !/^\d+(st|nd|rd|th)$/.test(w)).join(" ");
+}
+let CANON_INDEX = null;
+function canonIndex(){
+  if(CANON_INDEX) return CANON_INDEX;
+  CANON_INDEX = new Map();
+  for(const v of VENUES){
+    const forms = [v.abbr].concat(v.alts);
+    for(let y = 1990; y <= 2035; y++) forms.push(v.full(y));
+    forms.forEach(f => { const k = canon(f); if(k && !CANON_INDEX.has(k)) CANON_INDEX.set(k, v); });
+  }
+  return CANON_INDEX;
+}
+// Strict matching for the reformatter: a whole venue string must equal a known venue (so "... Machine Learning and Applications" is not ICML).
+function matchVenueStrict(raw){
+  const s = String(raw || "").replace(/\\&/g, "&").replace(/\\ /g, " ").replace(/[{}]/g, "").replace(/\s+/g, " ").trim();
+  if(!s) return {skip: "empty"};
+  if(/arxiv|\bcorr\b|preprint/i.test(s)) return {skip: "preprint"};
+  let ws = false;
+  if(/workshops?\b/i.test(s)){
+    if(/workshops?\s*(\([^)]*\))?\s*$/i.test(s) && !/workshops?\s+(on|for)\b/i.test(s)) ws = true;
+    else return {skip: "named workshop, left as written"};
+  }
+  const v = canonIndex().get(canon(s));
+  if(!v) return null;
+  if(ws && !v.ws) return {skip: "workshops of a venue not in the table"};
+  return {v, ws};
+}
+function readBalanced(s, i){            // s[i] is "{"; returns the index just after its matching "}", or -1
+  let d = 0;
+  for(let k = i; k < s.length; k++){
+    const ch = s[k];
+    if(ch === "\\"){ k++; continue; }
+    if(ch === "{") d++; else if(ch === "}"){ d--; if(d === 0) return k + 1; }
+  }
+  return -1;
+}
+// Rewrites only the booktitle / journal values; everything else in the file is left exactly as it was.
+function formatBib(text, o){
+  const style = o.venueStyle === "abbr" ? "abbr" : "full";
+  text = String(text || "");
+  let out = "", i = 0, nEntries = 0, nSame = 0, nPre = 0, noYear = 0;
+  const changes = [], unrec = new Map();
+  while(i < text.length){
+    const at = text.indexOf("@", i);
+    if(at < 0){ out += text.slice(i); break; }
+    out += text.slice(i, at);
+    const m = /^@\s*([A-Za-z]+)\s*([{(])/.exec(text.slice(at, at + 60));
+    if(!m){ out += "@"; i = at + 1; continue; }
+    const open = at + m[0].length - 1;
+    let end;
+    if(m[2] === "{") end = readBalanced(text, open);
+    else { end = text.indexOf(")", open); end = end < 0 ? -1 : end + 1; }
+    if(end < 0){ out += text.slice(at); break; }
+    let entry = text.slice(at, end);
+    i = end;
+    if(["comment","string","preamble"].includes(m[1].toLowerCase())){ out += entry; continue; }
+    const ob = m[0].length - 1, bodyEnd = entry.length - 1;
+    let p = entry.indexOf(",", ob);
+    if(p < 0){ out += entry; continue; }
+    nEntries++;
+    const key = entry.slice(ob + 1, p).trim(); p++;
+    const fields = [];
+    while(p < bodyEnd){
+      const mm = /^[\s,]*([A-Za-z_][\w:.-]*)\s*=\s*/.exec(entry.slice(p, bodyEnd));
+      if(!mm) break;
+      const vs = p + mm[0].length; let ve;
+      if(entry[vs] === "{"){ ve = readBalanced(entry, vs); if(ve < 0) break; }
+      else if(entry[vs] === '"'){ let k = vs + 1, d = 0; for(; k < bodyEnd; k++){ const c = entry[k]; if(c === "\\"){ k++; continue; } if(c === "{") d++; else if(c === "}") d--; else if(c === '"' && d === 0) break; } ve = k + 1; }
+      else { let k = vs; while(k < bodyEnd && entry[k] !== ",") k++; ve = k; }
+      fields.push({name: mm[1].toLowerCase(), vs, ve}); p = ve;
+    }
+    const val = f => { let v = entry.slice(f.vs, f.ve).trim(); if((v[0] === "{" && v.endsWith("}")) || (v[0] === '"' && v.endsWith('"'))) v = v.slice(1, -1); return v; };
+    const yf = fields.find(f => f.name === "year"), ym = yf && /\d{4}/.exec(val(yf));
+    const edits = [];
+    for(const f of fields.filter(f => f.name === "booktitle" || f.name === "journal")){
+      const raw = val(f), r = matchVenueStrict(raw), clean = raw.replace(/[{}]/g, "").replace(/\\&/g, "&").replace(/\s+/g, " ").trim();
+      if(r && r.skip === "preprint"){ nPre++; continue; }
+      if(!r || r.skip){ unrec.set(clean + (r ? "  (" + r.skip + ")" : ""), (unrec.get(clean + (r ? "  (" + r.skip + ")" : "")) || 0) + 1); continue; }
+      if(!ym) noYear++;
+      const name = styleName(r.v, ym ? +ym[0] : 2025, r.ws, style);
+      if(name === clean){ nSame++; continue; }
+      edits.push({vs: f.vs, ve: f.ve, text: "{" + tex(name, {accents: "latex"}) + "}"});
+      changes.push({key, from: clean, to: name});
+    }
+    edits.sort((a, b) => b.vs - a.vs).forEach(e => { entry = entry.slice(0, e.vs) + e.text + entry.slice(e.ve); });
+    out += entry;
+  }
+  return {out, changes, unrec: [...unrec], nEntries, nSame, nPre, noYear};
+}
+
 function matchVenue(dblpKey, raw){
   const k = String(dblpKey || "").split("/").slice(0, 2).join("/");
   if(k){ const v = VENUES.find(v => v.dblp.includes(k)); if(v) return v; }
   const r = String(raw || "");
   return VENUES.find(v => v.re.test(r)) || null;
 }
-function venueName(c){
+function venueName(c, o){
   if(!c.v) return c.venueRaw || "";
-  const n = c.v.full(c.year || 0);
-  return (c.kind === "conf" && c.ws && c.v.ws) ? n + " Workshops" : n;
+  return styleName(c.v, c.year, c.kind === "conf" && c.ws && c.v.ws, o && o.venueStyle);
 }
 
 // ---------- parsing API responses ----------
@@ -259,8 +406,18 @@ function xmlDecode(s){
 }
 function parseArxivAtom(xml){
   const e = String(xml).match(/<entry>([\s\S]*?)<\/entry>/);
-  if(!e) return null;
-  const b = e[1];
+  return e ? parseEntryBody(e[1]) : null;
+}
+function parseArxivFeed(xml){            // several entries at once, keyed by arXiv ID (version stripped)
+  const map = {};
+  for(const e of String(xml).matchAll(/<entry>([\s\S]*?)<\/entry>/g)){
+    const idm = e[1].match(/<id>[^<]*?\/abs\/([^<\s]+?)(?:v\d+)?<\/id>/);
+    const r = parseEntryBody(e[1]);
+    if(idm && r) map[idm[1]] = r;
+  }
+  return map;
+}
+function parseEntryBody(b){
   const one = tag => {
     const m = b.match(new RegExp("<" + tag + "(?:\\s[^>]*)?>([\\s\\S]*?)</" + tag + ">"));
     return m ? xmlDecode(m[1]).replace(/\s+/g, " ").trim() : "";
@@ -300,6 +457,48 @@ function makeKey(authors, year, title){
   return `${last}${year || ""}${word}`;
 }
 
+// ---------- smart citation keys ----------
+// Rules, in order: (1) an acronym in parentheses, "Open Set Recognition (OSR)" -> OSR; (2) the part before a colon or dash is the
+// method/topic name, "Swin Transformer: Hierarchical ..." -> SwinTransformer; (3) otherwise the first few content words.
+// Stop words are dropped, words are CamelCased, and capitals inside a word (SimGCD, ViT) are kept.
+const SHORT_STOP = new Set([...STOP, "novel","new","approach","its","as","or","be","than","that","this","these","those","into","over","your","our","their"]);
+function camelWords(words){ return words.map(w => w[0].toUpperCase() + w.slice(1)).join(""); }
+function titleTokens(t, dropStops){          // hyphenated words stay one unit: Fine-Tuning -> FineTuning
+  return String(t || "").split(/[\s\/,;:!?]+/)
+    .filter(w => w && !/[$\\]/.test(w))
+    .map(w => w.split(/[\-\u2010-\u2015]+/).map(asciiOnly).filter(Boolean).map(x => x[0].toUpperCase() + x.slice(1)).join("")).filter(Boolean)
+    .filter(w => !(dropStops && SHORT_STOP.has(w.toLowerCase())));
+}
+function takeWords(words, maxWords, maxLen){
+  const out = [];
+  for(const w of words){
+    if(out.length >= maxWords) break;
+    if(out.length && out.join("").length + w.length > maxLen) break;
+    out.push(w);
+  }
+  return out;
+}
+function shortName(title){
+  let t = String(title || "").replace(/\s+/g, " ").trim();
+  const sep = t.search(/\s*[:\u2013\u2014]\s+|\s+-\s+|\?\s+\S/);          // colon, en/em dash, " - ", or a question mark followed by more text
+  const head = sep > 0 ? t.slice(0, sep + (t[sep] === "?" ? 1 : 0)) : t;
+  const ac = head.match(/\(([A-Za-z][A-Za-z0-9+\-]{1,9})\)/);
+  if(ac && /[A-Z]/.test(ac[1].slice(1))) return asciiOnly(ac[1]);
+  const words = titleTokens(head.replace(/\([^)]*\)/g, " "), true);
+  if(!words.length) return titleTokens(t, false).slice(0, 3).map(w => w[0].toUpperCase() + w.slice(1)).join("");
+  const n = words.length <= 4 ? words.length : 3;
+  return camelWords(takeWords(words, n, 32));
+}
+function fullTitleName(title){
+  const words = titleTokens(String(title || "").replace(/\([^)]*\)/g, " "), false);
+  return camelWords(takeWords(words, 99, 60));
+}
+function makeKeyStyled(authors, year, title, style){
+  if(style === "short" || style === "short_year"){ const n = shortName(title); if(n) return n + (style === "short_year" ? (year || "") : ""); }
+  else if(style === "full"){ const n = fullTitleName(title); if(n) return n; }
+  return makeKey(authors, year, title);
+}
+
 // ---------- candidates ----------
 function candFromDblp(h){
   const i = (h && h.info) || {};
@@ -332,10 +531,39 @@ function candFromS2(meta, s2){
     ws: /workshop/i.test(raw), pages: fromJr ? (jr.pages || "") : "", volume: fromJr ? (jr.volume || "") : "", number: "",
     doi: ids.DOI && !/^10\.48550\//.test(ids.DOI) ? ids.DOI : ""};
 }
-function buildCandidates(meta, s2, dblp){
+function candFromCrossref(it){
+  if(!it) return null;
+  const type = it.type || "", isJ = type === "journal-article", isC = type === "proceedings-article";
+  if(!isJ && !isC) return null;
+  const raw = [].concat(it["container-title"] || [])[0] || "";
+  const doi = it.DOI || "";
+  if(!raw || /arxiv|\bcorr\b/i.test(raw) || /^10\.48550\//.test(doi)) return null;
+  const strip = x => String(x || "").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+  const dp = it.issued && it.issued["date-parts"] && it.issued["date-parts"][0];
+  const v = matchVenue("", raw);
+  return {kind: isJ ? "journal" : "conf", source: "Crossref", dblpKey: "", title: strip([].concat(it.title || [])[0]),
+    authors: (it.author || []).map(a => [a.given, a.family].filter(Boolean).join(" ") || a.name || "").filter(Boolean),
+    year: dp && dp[0] ? +dp[0] : null, v, venueRaw: raw, ws: /workshop/i.test(raw),
+    pages: it.page || "", volume: it.volume || "", number: it.issue || "", doi};
+}
+function parseDatacite(txt){
+  const a = JSON.parse(txt).data.attributes;
+  const title = a.titles && a.titles[0] && a.titles[0].title;
+  if(!title) return null;
+  const authors = (a.creators || []).map(c => {
+    if(c.givenName && c.familyName) return c.givenName + " " + c.familyName;
+    const n = c.name || ""; return n.includes(",") ? n.split(",").map(x => x.trim()).reverse().join(" ") : n;
+  }).filter(Boolean);
+  const subj = (a.subjects || []).find(x => /arxiv/i.test(x.subjectScheme || ""));
+  const pc = subj && /\(([^)]+)\)\s*$/.exec(subj.subject || "");
+  return {title: String(title).replace(/\s+/g, " ").trim(), authors, year: a.publicationYear ? +a.publicationYear : null, primaryClass: pc ? pc[1] : ""};
+}
+const SRC_RANK = {"DBLP": 0, "Crossref": 1, "Semantic Scholar": 2};
+function buildCandidates(meta, s2, dblp, cr){
   const s2Dblp = (s2 && s2.externalIds && s2.externalIds.DBLP) || "";
   let list = [];
   for(const h of (dblp && dblp.hits) || []){ const c = candFromDblp(h); if(c) list.push(c); }
+  for(const it of (cr && cr.items) || []){ const c = candFromCrossref(it); if(c) list.push(c); }
   const sc = candFromS2(meta, s2); if(sc) list.push(sc);
   for(const c of list){
     c.ts = titleSim(meta.title, c.title);
@@ -345,9 +573,16 @@ function buildCandidates(meta, s2, dblp){
     c.good = c.ts >= 0.85 && c.ov >= 0.5;
   }
   list = list.filter(c => c.ts >= 0.5 && c.ov >= 0.2);     // drop clear non-matches
-  // an S2-only candidate is redundant if DBLP already found the same venue
-  list = list.filter(c => !(c.source === "Semantic Scholar" && list.some(d => d.source === "DBLP" && d.good && d.v && c.v && d.v.id === c.v.id)));
   list.sort((a, b) => b.score - a.score);
+  // the same venue and year from several sources is one candidate: keep the best source (DBLP > Crossref > Semantic Scholar)
+  const rank = c => (c.good ? 0 : 10) + (SRC_RANK[c.source] || 0);
+  const kept = new Map();
+  for(const c of list){
+    const k = (c.v ? c.v.id : norm(c.venueRaw)) + "|" + (c.year || "") + "|" + (c.ws ? "w" : "");
+    const old = kept.get(k);
+    if(!old || rank(c) < rank(old)) kept.set(k, c);
+  }
+  list = list.filter(c => [...kept.values()].includes(c));
   list = list.slice(0, 6);
   list.push({kind: "preprint", source: "arXiv", title: meta.title, authors: meta.authors, year: meta.year, name: "", good: true, ts: 1, ov: 1, score: 0});
   return list;
@@ -367,11 +602,11 @@ function buildBib(meta, c, key, opts){
   let type;
   if(c.kind === "conf"){
     type = "inproceedings";
-    add("title", T(c.title, {protect: true})); add("author", authorStr); add("booktitle", T(venueName(c)));
+    add("title", T(c.title, {protect: true})); add("author", authorStr); add("booktitle", T(venueName(c, opts)));
     add("pages", fixPages(c.pages)); add("year", c.year); add("doi", c.doi);
   } else if(c.kind === "journal"){
     type = "article";
-    add("title", T(c.title, {protect: true})); add("author", authorStr); add("journal", T(venueName(c)));
+    add("title", T(c.title, {protect: true})); add("author", authorStr); add("journal", T(venueName(c, opts)));
     add("volume", T(c.volume)); add("number", T(c.number)); add("pages", fixPages(c.pages)); add("year", c.year); add("doi", c.doi);
   } else if(opts.preprint === "article"){
     type = "article";
@@ -384,16 +619,16 @@ function buildBib(meta, c, key, opts){
   }
   return `@${type}{${key},\n${lines.join(",\n")}\n}`;
 }
-function keyFor(meta, c){
+function keyFor(meta, c, style){
   const preprint = c.kind === "preprint";
-  return makeKey(preprint ? meta.authors : (c.authors.length ? c.authors : meta.authors),
-                 preprint ? meta.year : c.year, preprint ? meta.title : c.title);
+  return makeKeyStyled(preprint ? meta.authors : (c.authors.length ? c.authors : meta.authors),
+                 preprint ? meta.year : c.year, preprint ? meta.title : c.title, style || "author");
 }
 function warningsFor(meta, c, ctx){
   const w = [];
   if(c.kind === "preprint"){
-    if(ctx.dblpFailed && ctx.s2Failed) w.push("Couldn't reach DBLP or Semantic Scholar from this browser, so I can't tell whether a published version exists. Check the connection log.");
-    else if(ctx.dblpFailed) w.push("DBLP couldn't be reached from this browser, so a published version may exist that wasn't found. See the connection log.");
+    if(ctx.dblpFailed && ctx.crossrefFailed && ctx.s2Failed) w.push("Couldn't get anything from DBLP, Crossref or Semantic Scholar, so I can't tell whether a published version exists. Try again in a minute (see the status chips above).");
+    else if(ctx.dblpFailed && ctx.crossrefFailed) w.push("DBLP and Crossref couldn't be reached, so a published version may exist that wasn't found. Try again in a minute (see the status chips above).");
     else if(ctx.anyPublished) w.push("Possible published versions are listed above, but none matched the arXiv title and authors closely enough to pick automatically. If one of them is your paper, select it.");
     else w.push("No published version found. If this paper was published, it may be too new for DBLP, or the title changed. Check the paper's page.");
     if(meta.journalRef) w.push(`The authors' arXiv entry lists: "${meta.journalRef}". If that's what you're citing, none of the published matches above were found automatically.`);
@@ -404,12 +639,13 @@ function warningsFor(meta, c, ctx){
   if(!c.v) w.push(`I don't have a full name for the venue "${c.venueRaw}", so it is used as written. Check it, or add it to the venue table in the page source.`);
   if(c.ws && c.v && !c.v.ws) w.push("This looks like a workshop paper. Check that the booktitle is right.");
   if(/findings/i.test(c.venueRaw)) w.push("This looks like a Findings paper, which has its own proceedings title. Check the booktitle.");
+  if(c.source === "Crossref") w.push("Found through Crossref, which DBLP didn't list. Check the venue name and pages against the paper's page.");
   if(c.source === "Semantic Scholar") w.push("Venue and year come from Semantic Scholar only" + (ctx.dblpFailed ? " (DBLP couldn't be reached from this browser, so there are no page numbers)" : " (no page numbers)") + ". Check them against the paper's page.");
   if(c.year && meta.year && Math.abs(c.year - meta.year) > 2) w.push(`The published year (${c.year}) is far from the arXiv year (${meta.year}). Check that this is the right paper.`);
   if(ctx.nStrong > 1) w.push("More than one published record matches (for example a conference paper and a journal extension). Make sure you picked the right one.");
   return w;
 }
-function provenance(meta, c){
+function provenance(meta, c, opts){
   const rows = [];
   if(c.kind === "preprint"){
     rows.push(["Title", meta.title, meta.src], ["Authors", meta.authors.join("; "), meta.src], ["Year", meta.year, "arXiv ID / submission date"],
@@ -417,35 +653,51 @@ function provenance(meta, c){
     if(meta.primaryClass) rows.push(["Category", meta.primaryClass, meta.src]);
   } else {
     rows.push(["Title", c.title, c.source], ["Authors", c.authors.join("; "), c.source],
-              ["Venue", venueName(c) + (c.v ? "  (name from the page's venue table)" : "  (as written by the source)"), c.source],
+              ["Venue", venueName(c, opts) + (c.v ? "  (name from the page's venue table)" : "  (as written by the source)"), c.source],
               ["Year", c.year, c.source]);
     if(c.pages) rows.push(["Pages", c.pages, c.source]);
     if(c.volume) rows.push(["Volume / number", c.volume + (c.number ? " / " + c.number : ""), c.source]);
     if(c.doi) rows.push(["DOI", c.doi, c.source]);
   }
-  rows.push(["Citation key", "", "generated from first author, year, first title word"]);
+  const ks = opts && opts.keyStyle;
+  rows.push(["Citation key", "", ks === "full" ? "title in CamelCase" : ks === "short" || ks === "short_year" ? "short name from the title" + (ks === "short_year" ? " + year" : "") : "first author, year, first title word"]);
   return rows;
 }
 
-// ---------- network orchestration (fetcher is injectable for tests) ----------
-function makeCaller(fetcher, log){
-  return async function call(name, url, o){
-    o = o || {};
-    for(let attempt = 0; attempt < 2; attempt++){
+// ---------- network orchestration (fetcher, cache, probe, delays are injectable for tests) ----------
+// Every call retries on rate limits, server errors, timeouts and network errors. A 404 is an answer ("not indexed"), never retried.
+// If a request dies at the network level, o.probe(url) tells "server answered but the browser couldn't read it" (typically an error
+// or rate-limit response without CORS headers) apart from "couldn't reach the server at all".
+function makeCaller(fetcher, log, o){
+  o = o || {};
+  const delays = o.delays || [800, 2200], wait = o.sleep || sleep, status = {};
+  async function call(name, url){
+    if(o.skip && o.skip.has(name)){ status[name] = {state: "skipped"}; return null; }
+    const hit = o.cache && !o.refresh ? o.cache.get(url) : null;
+    if(hit){ log(`CACHE ${name}: saved response from ${Math.max(1, Math.round((Date.now() - hit.t) / 60000))} min ago`); status[name] = {state: "ok", cached: true, ageMin: Math.max(1, Math.round((Date.now() - hit.t) / 60000))}; return {ok: true, status: 200, text: hit.text}; }
+    let last = "error", note = "";
+    for(let attempt = 0; attempt <= delays.length; attempt++){
       const t0 = Date.now();
       try{
-        const r = await fetcher(url);
-        const ms = Date.now() - t0;
-        if(r.status === 429 && o.retry429 && attempt === 0){ log(`${name}: rate limited (429), retrying once…`); await sleep(1500); continue; }
-        if(r.ok){ log(`OK    ${name}: ${r.status} in ${ms} ms`); return r; }
-        log(`FAIL  ${name}: HTTP ${r.status}`); return null;
+        const r = await fetcher(url), ms = Date.now() - t0;
+        if(r.ok){ log(`OK    ${name}: ${r.status} in ${ms} ms${attempt ? ` (attempt ${attempt + 1})` : ""}`); if(o.cache) o.cache.set(url, r.text); status[name] = {state: "ok", ms, attempts: attempt + 1}; return r; }
+        if(r.status === 404){ log(`MISS  ${name}: 404, not found`); status[name] = {state: "notfound"}; return null; }
+        last = r.status === 429 ? "ratelimited" : "error"; note = "HTTP " + r.status;
+        log(`WARN  ${name}: HTTP ${r.status}${attempt < delays.length ? ", retrying" : ""}`);
       }catch(e){
-        log(`FAIL  ${name}: ${e && e.name === "AbortError" ? "timed out" : "request failed (blocked by the browser's cross-site rules, offline, or the service is down)"}`);
-        return null;
+        last = e && e.name === "AbortError" ? "timeout" : "network"; note = last === "timeout" ? "timed out" : "request failed";
+        log(`WARN  ${name}: ${note}${attempt < delays.length ? ", retrying" : ""}`);
       }
+      if(attempt < delays.length) await wait(delays[attempt]);
     }
+    if(last === "network" && o.probe){ last = (await o.probe(url)) ? "unreadable" : "unreachable"; }
+    log(`FAIL  ${name}: ${last} (${note})`);
+    if(o.skip && last === "ratelimited" && name === "Semantic Scholar") o.skip.add(name);   // batch runs stop hammering a service that already said no
+    status[name] = {state: last, note};
     return null;
-  };
+  }
+  call.status = status;
+  return call;
 }
 async function searchDblp(title, call){
   const words = norm(title).split(" ").filter(Boolean);
@@ -460,30 +712,67 @@ async function searchDblp(title, call){
   }
   return {failed: false, hits: []};
 }
-async function lookup(id, fetcher, log){
-  const call = makeCaller(fetcher, log);
+async function searchCrossref(meta, call){
+  const first = meta.authors[0] ? splitName(meta.authors[0]).last : "";
+  const url = "https://api.crossref.org/works?query.title=" + encodeURIComponent(meta.title) + (first ? "&query.author=" + encodeURIComponent(first) : "") +
+    "&rows=6&select=DOI,title,container-title,type,page,volume,issue,issued,author";
+  const r = await call("Crossref", url);
+  if(!r) return {failed: true, items: []};
+  try{ return {failed: false, items: (JSON.parse(r.text).message || {}).items || []}; }catch(e){ return {failed: true, items: []}; }
+}
+async function lookup(id, fetcher, log, o){
+  const call = makeCaller(fetcher, log, o);
   const S2F = "title,year,venue,publicationVenue,externalIds,authors.name,journal";
-  const [axr, s2r] = await Promise.all([
-    call("arXiv API", `https://export.arxiv.org/api/query?id_list=${id}&max_results=1`),
-    call("Semantic Scholar", `https://api.semanticscholar.org/graph/v1/paper/ARXIV:${id}?fields=${S2F}`, {retry429: true})
-  ]);
-  const ax = axr ? parseArxivAtom(axr.text) : null;
+  const s2p = call("Semantic Scholar", `https://api.semanticscholar.org/graph/v1/paper/ARXIV:${id}?fields=${S2F}`);
+  let ax = null, src = "arXiv API";
+  if(o && o.axMap){ ax = o.axMap[id] || null; if(o.axStatus) call.status["arXiv API"] = o.axStatus; }     // batch: already fetched in one request
+  else { const axr = await call("arXiv API", `https://export.arxiv.org/api/query?id_list=${id}&max_results=1`); ax = axr ? parseArxivAtom(axr.text) : null; }
+  const s2r = await s2p;
   let s2 = null;
   if(s2r){ try{ s2 = JSON.parse(s2r.text); }catch(e){} if(s2 && !s2.title) s2 = null; }
-  if(!ax && !s2) throw new Error("Couldn't fetch this paper's details from arXiv or Semantic Scholar. See the connection log below.");
+  if(!ax){                                    // arXiv itself unavailable: DataCite has the same record (title, authors, year, category)
+    const dr = await call("DataCite", "https://api.datacite.org/dois/10.48550/arxiv." + id);
+    if(dr){ try{ const d = parseDatacite(dr.text); if(d){ ax = Object.assign({journalRef: ""}, d); src = "DataCite"; } }catch(e){} }
+  }
+  if(!ax && !s2) throw Object.assign(new Error("Couldn't fetch this paper's details from arXiv, DataCite or Semantic Scholar. See the status chips and connection log below."), {status: call.status});
   const meta = ax
-    ? {id, title: ax.title, authors: ax.authors, year: yearFromArxivId(id) || ax.year, primaryClass: ax.primaryClass, journalRef: ax.journalRef, src: "arXiv API"}
+    ? {id, title: ax.title, authors: ax.authors, year: yearFromArxivId(id) || ax.year, primaryClass: ax.primaryClass, journalRef: ax.journalRef, src}
     : {id, title: s2.title, authors: (s2.authors || []).map(a => a.name).filter(Boolean), year: yearFromArxivId(id) || s2.year, primaryClass: "", journalRef: "", src: "Semantic Scholar"};
-  const dblp = await searchDblp(meta.title, call);
-  const cands = buildCandidates(meta, s2, dblp);
+  const [dblp, cr] = await Promise.all([searchDblp(meta.title, call), searchCrossref(meta, call)]);
+  const cands = buildCandidates(meta, s2, dblp, cr);
   const published = cands.filter(c => c.kind !== "preprint");
-  return {meta, cands, sel: defaultSelection(cands),
-          ctx: {dblpFailed: dblp.failed, s2Failed: !s2, anyPublished: published.length > 0, nStrong: published.filter(c => c.good).length}};
+  return {meta, cands, sel: defaultSelection(cands), status: call.status,
+          ctx: {dblpFailed: dblp.failed, crossrefFailed: cr.failed, s2Failed: !s2, anyPublished: published.length > 0, nStrong: published.filter(c => c.good).length}};
+}
+
+// Many papers: one arXiv request per 25 IDs, then DBLP / Crossref / Semantic Scholar per paper, two at a time with a short pause.
+async function lookupMany(ids, fetcher, log, o, onItem){
+  o = Object.assign({}, o);
+  const wait = o.sleep || sleep, call = makeCaller(fetcher, log, o), axMap = {}, axStatus = {}, results = new Array(ids.length), skip = new Set();
+  for(let s = 0; s < ids.length; s += 25){
+    if(s) await wait(o.chunkGap == null ? 3000 : o.chunkGap);
+    const chunk = ids.slice(s, s + 25);
+    const r = await call("arXiv API", `https://export.arxiv.org/api/query?id_list=${chunk.join(",")}&max_results=${chunk.length}`);
+    const feed = r ? parseArxivFeed(r.text) : {};
+    chunk.forEach(id => { axMap[id] = feed[id] || null; axStatus[id] = call.status["arXiv API"]; });
+  }
+  let next = 0;
+  const worker = async () => {
+    while(next < ids.length){
+      const k = next++, id = ids[k];
+      try{ results[k] = await lookup(id, fetcher, ids.length > 1 ? (l => log(`[${id}] ${l}`)) : log, Object.assign({}, o, {axMap: {[id]: axMap[id]}, axStatus: axStatus[id], skip})); results[k].id = id; }
+      catch(e){ results[k] = {id, error: e.message, status: e.status}; }
+      if(onItem) onItem(k, results[k]);
+      await wait(o.pace == null ? 250 : o.pace);
+    }
+  };
+  await Promise.all(Array.from({length: Math.min(o.concurrency || 2, ids.length)}, worker));
+  return results;
 }
 
 if(typeof globalThis !== "undefined"){
   globalThis.__bib = {parseArxivId, yearFromArxivId, splitName, formatAuthor, tex, accentize, protectCaps, fixPages, matchVenue, venueName,
-    parseArxivAtom, titleSim, authorOverlap, makeKey, candFromDblp, candFromS2, buildCandidates, defaultSelection, buildBib, keyFor,
+    parseArxivAtom, titleSim, authorOverlap, makeKey, candFromDblp, candFromS2, shortName, fullTitleName, makeKeyStyled, candFromCrossref, parseDatacite, parseArxivFeed, lookupMany, formatBib, matchVenueStrict, styleName, buildCandidates, defaultSelection, buildBib, keyFor,
     warningsFor, provenance, lookup, ordinal, VENUES};
 }
 
@@ -502,9 +791,9 @@ if(typeof document !== "undefined"){
     get(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } },
     set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
   };
-  const opts = Object.assign({preprint: "misc", accents: "latex"}, store.get("bibOpts") || {});
-  let R = null;            // current lookup result
-  let keyEdited = false;
+  const opts = Object.assign({preprint: "misc", accents: "latex", venueStyle: "full", keyStyle: "short_year"}, store.get("bibOpts") || {});
+  const MAX_PAPERS = 60;
+  let items = [];          // {id, R, err, sel, key, keyEdited, el}
   let logLines = [];
   const log = line => { logLines.push(line); $("log").textContent = logLines.join("\n"); };
 
@@ -515,66 +804,169 @@ if(typeof document !== "undefined"){
       finally{ clearTimeout(to); }
     };
   }
+  function probe(url){      // no-cors fetches resolve if the server answered at all, and reject only on a network-level failure
+    const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 8000);
+    return fetch(url, {mode: "no-cors", signal: ctl.signal}).then(() => true, () => false).finally(() => clearTimeout(to));
+  }
   function setStatus(msg, err){ const s = $("status"); s.textContent = msg || ""; s.className = err ? "err" : ""; }
 
-  function render(){
-    if(!R) return;
-    const c = R.cands[R.sel];
-    if(!keyEdited) $("key").value = keyFor(R.meta, c);
-    $("out").value = buildBib(R.meta, c, $("key").value.trim() || keyFor(R.meta, c), opts);
-
-    const box = $("cands"); box.textContent = "";
-    R.cands.forEach((cd, i) => {
-      const preprint = cd.kind === "preprint";
-      const label = preprint ? "arXiv preprint" : `${cd.v ? cd.v.abbr : cd.venueRaw}${cd.ws ? " Workshops" : ""} ${cd.year || ""}`.trim();
-      const meta2 = preprint ? "Use this if you're citing the preprint itself, or nothing published was found."
-        : [h("b", {}, cd.source), ` · title match ${Math.round(cd.ts * 100)}% · author match ${Math.round(cd.ov * 100)}%`, cd.pages ? ` · pages ${cd.pages}` : ""];
-      const radio = h("input", {type: "radio", name: "cand"}); radio.checked = i === R.sel;
-      const row = h("label", {class: "cand" + (i === R.sel ? " on" : "")}, radio,
-        h("div", {}, h("div", {class: "t"}, label), preprint ? null : h("div", {class: "m"}, cd.title), h("div", {class: "m"}, meta2)));
-      radio.addEventListener("change", () => { R.sel = i; render(); });
-      box.append(row);
+  // ---------- service status chips ----------
+  const CHIP_ORDER = ["arXiv API", "DataCite", "Semantic Scholar", "DBLP", "Crossref"];
+  const CHIP_TEXT = {ok: "ok", notfound: "not indexed yet", ratelimited: "rate limited", unreadable: "answered but blocked or errored", unreachable: "unreachable",
+                     timeout: "timed out", error: "server error", network: "failed", skipped: "skipped after a rate limit"};
+  function renderChips(statuses){
+    const box = $("chips"); box.textContent = "";
+    const many = statuses.filter(Boolean).length > 1;
+    CHIP_ORDER.forEach(n => {
+      const counts = {}; let seen = 0;
+      statuses.forEach(st => { if(st && st[n]){ counts[st[n].state] = (counts[st[n].state] || 0) + 1; seen++; } });
+      if(!seen) return;
+      const states = Object.keys(counts), good = states.every(x => x === "ok" || x === "notfound" || x === "skipped");
+      const txt = states.length === 1 && states[0] === "ok" ? "ok" : states.map(x => (many ? counts[x] + "× " : "") + (CHIP_TEXT[x] || x)).join(", ");
+      box.append(h("span", {class: "chip " + (good ? "ok" : "bad")}, n + ": " + txt));
     });
+    box.hidden = !box.childNodes.length;
+  }
 
-    const wb = $("warns"); wb.textContent = "";
-    warningsFor(R.meta, c, R.ctx).forEach(t => wb.append(h("div", {class: "warn"}, t)));
-
-    const pt = $("prov"); pt.textContent = "";
-    pt.append(h("tr", {}, h("th", {}, "Field"), h("th", {}, "Value"), h("th", {}, "Source")));
-    provenance(R.meta, c).forEach(r => pt.append(h("tr", {}, h("td", {}, r[0]), h("td", {}, r[1] == null ? "" : r[1]), h("td", {}, r[2]))));
+  // ---------- items ----------
+  function uniqueKeys(){
+    const seen = new Set();
+    items.forEach(it => {
+      if(!it.R) return;
+      const c = it.R.cands[it.sel];
+      let k = it.keyEdited && it.key ? it.key : keyFor(it.R.meta, c, opts.keyStyle);
+      if(seen.has(k)){ let n = 0; while(seen.has(k + String.fromCharCode(97 + n))) n++; k = k + String.fromCharCode(97 + n); }
+      seen.add(k); it.shownKey = k;
+    });
+  }
+  function rebuildOutput(){
+    uniqueKeys();
+    $("out").value = items.filter(it => it.R).map(it => buildBib(it.R.meta, it.R.cands[it.sel], it.shownKey, opts)).join("\n\n");
+    items.forEach(it => { if(it.keyInput && !it.keyEdited) it.keyInput.value = it.shownKey || ""; });
+  }
+  function itemLabel(it){
+    const c = it.R.cands[it.sel];
+    return c.kind === "preprint" ? "arXiv preprint" : `${c.v ? c.v.abbr : c.venueRaw}${c.ws ? " Workshops" : ""} ${c.year || ""}`.trim();
+  }
+  function renderItem(it){
+    const wasOpen = it.el ? it.el.open : items.length === 1;
+    let node;
+    if(it.err){
+      node = h("details", {class: "item", open: ""}, h("summary", {}, h("b", {}, it.id), h("span", {class: "badge bad"}, "failed")),
+        h("div", {class: "body"}, h("div", {class: "warn"}, it.err)));
+    } else {
+      const R = it.R, c = R.cands[it.sel];
+      const warns = warningsFor(R.meta, c, R.ctx);
+      const pub = c.kind !== "preprint";
+      const box = h("div", {});
+      R.cands.forEach((cd, i) => {
+        const preprint = cd.kind === "preprint";
+        const label = preprint ? "arXiv preprint" : `${cd.v ? cd.v.abbr : cd.venueRaw}${cd.ws ? " Workshops" : ""} ${cd.year || ""}`.trim();
+        const meta2 = preprint ? "Use this if you're citing the preprint itself, or nothing published was found."
+          : [h("b", {}, cd.source), ` · title match ${Math.round(cd.ts * 100)}% · author match ${Math.round(cd.ov * 100)}%`, cd.pages ? ` · pages ${cd.pages}` : ""];
+        const radio = h("input", {type: "radio", name: "cand-" + it.id}); radio.checked = i === it.sel;
+        const row = h("label", {class: "cand" + (i === it.sel ? " on" : "")}, radio,
+          h("div", {}, h("div", {class: "t"}, label), preprint ? null : h("div", {class: "m"}, cd.title), h("div", {class: "m"}, meta2)));
+        radio.addEventListener("change", () => { it.sel = i; if(!it.keyEdited) it.key = ""; renderItem(it); rebuildOutput(); });
+        box.append(row);
+      });
+      const keyInput = h("input", {type: "text", spellcheck: "false", autocomplete: "off", "aria-label": "Citation key"});
+      keyInput.addEventListener("input", () => { it.keyEdited = true; it.key = keyInput.value.trim(); rebuildOutput(); });
+      it.keyInput = keyInput;
+      const prov = h("table", {});
+      prov.append(h("tr", {}, h("th", {}, "Field"), h("th", {}, "Value"), h("th", {}, "Source")));
+      provenance(R.meta, c, opts).forEach(r => prov.append(h("tr", {}, h("td", {}, r[0]), h("td", {}, r[1] == null ? "" : r[1]), h("td", {}, r[2]))));
+      node = h("details", {class: "item"},
+        h("summary", {}, h("b", {}, itemLabel(it)), " ", h("span", {class: "sum-m"}, "· " + R.meta.title), warns.length ? h("span", {class: "badge"}, "⚠ " + warns.length) : null),
+        h("div", {class: "body"}, box, warns.map(t => h("div", {class: "warn"}, t)),
+          h("div", {class: "keyrow"}, "Key", keyInput), h("details", {}, h("summary", {}, "Where each field came from"), prov)));
+      if(wasOpen) node.setAttribute("open", "");
+      keyInput.value = it.shownKey || "";
+    }
+    if(it.el && it.el.parentNode) it.el.replaceWith(node); else $("items").append(node);
+    it.el = node;
   }
 
   async function run(input){
-    const id = parseArxivId(input);
-    $("result").hidden = true; $("copied").textContent = "";
-    logLines = []; $("log").textContent = "";
-    if(!id){ setStatus("Couldn't find an arXiv ID in that. Try a link like https://arxiv.org/abs/2201.02609 or just 2201.02609.", true); return; }
-    $("go").disabled = true; setStatus(`Looking up arXiv:${id} …`);
+    $("result").hidden = true; $("copied").textContent = ""; $("chips").hidden = true;
+    logLines = []; $("log").textContent = ""; $("items").textContent = ""; items = [];
+    const lines = String(input || "").split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+    const ids = [], bad = [];
+    lines.forEach(l => { const id = parseArxivId(l); if(!id) bad.push(l); else if(!ids.includes(id)) ids.push(id); });
+    if(!ids.length){ setStatus(lines.length ? "Couldn't find an arXiv ID in that. Try a link like https://arxiv.org/abs/2201.02609 or just 2201.02609." : "Paste one or more arXiv links, one per line.", true); return; }
+    let note = "";
+    if(ids.length > MAX_PAPERS){ ids.length = MAX_PAPERS; note += ` Only the first ${MAX_PAPERS} were used.`; }
+    if(bad.length) note += ` Skipped ${bad.length} line${bad.length > 1 ? "s" : ""} with no arXiv ID.`;
+    const total = ids.length; let done = 0;
+    $("go").disabled = true; setStatus(total > 1 ? `Looking up ${total} papers …` : `Looking up arXiv:${ids[0]} …`);
+    $("itemsHead").textContent = total > 1 ? "Check each paper" : "Which version are you citing?";
+    items = ids.map(id => ({id, R: null, err: "", sel: 0, key: "", keyEdited: false, el: null}));
+    items.forEach(it => { it.el = null; });
     try{
-      R = await lookup(id, browserFetcher(12000), log);
-      keyEdited = false;
-      $("result").hidden = false;
-      const pub = R.cands[R.sel].kind !== "preprint";
-      setStatus(pub ? "Found a published version. Check it below before you copy." : "Using the arXiv preprint. See below for details.");
-      render();
+      const results = await lookupMany(ids, browserFetcher(12000), log, {probe}, (k, res) => {
+        const it = items[k]; done++;
+        if(res.error) it.err = res.error; else { it.R = res.R || res; it.sel = res.sel; }
+        $("result").hidden = false;
+        renderItem(it); rebuildOutput();
+        if(done < total) setStatus(`Looking up ${total} papers … ${done}/${total}`);
+      });
+      renderChips(results.map(r => r && r.status));
+      const failed = results.filter(r => r.error).length, ok = results.filter(r => !r.error);
+      const nPub = ok.filter(r => r.cands[r.sel].kind !== "preprint").length;
+      if(!ok.length){ setStatus(total === 1 ? results[0].error : `None of the ${total} papers could be fetched. See the status chips and connection log.`, true); $("diag").open = true; }
+      else if(total === 1) setStatus(nPub ? "Found a published version. Check it below before you copy." : "Using the arXiv preprint. See below for details.");
+      else setStatus(`${ok.length} of ${total} done: ${nPub} with a published version, ${ok.length - nPub} preprint only${failed ? `, ${failed} failed` : ""}. Open each to check.`);
+      if(note) setStatus($("status").textContent + note, !ok.length);
+      if(failed) $("diag").open = true;
     }catch(e){
-      R = null; setStatus(e.message || "Something went wrong.", true);
-      $("diag").open = true;
+      setStatus(e.message || "Something went wrong.", true);
     }finally{ $("go").disabled = false; }
   }
 
+  // ---------- reformatter ----------
+  function reformat(){
+    const text = $("fin").value;
+    if(!text.trim()){ $("fout").value = ""; $("freport").textContent = ""; $("fstat").textContent = ""; return; }
+    const r = formatBib(text, opts);
+    $("fout").value = r.out;
+    $("fstat").textContent = r.nEntries ? "" : "No BibTeX entries found.";
+    const rep = $("freport"); rep.textContent = "";
+    if(!r.nEntries) return;
+    rep.append(h("div", {class: "info rep"},
+      `${r.nEntries} entries · ${r.changes.length} venue names changed · ${r.nSame} already in this style · ${r.nPre} arXiv preprints left alone`,
+      r.noYear ? ` · ${r.noYear} without a year (used current naming)` : "",
+      r.changes.length ? h("details", {}, h("summary", {}, "Show changes"), h("ul", {}, r.changes.map(c => h("li", {}, `${c.key}: ${c.from} → ${c.to}`)))) : null));
+    if(r.unrec.length) rep.append(h("div", {class: "warn rep"}, "Not recognised, left exactly as written:",
+      h("ul", {}, r.unrec.map(([n, k]) => h("li", {}, n + (k > 1 ? `  ×${k}` : ""))))));
+  }
+
+  // ---------- wiring ----------
   $("f").addEventListener("submit", e => { e.preventDefault(); run($("q").value); });
-  $("key").addEventListener("input", () => { keyEdited = true; render(); });
-  $("optPre").value = opts.preprint; $("optAcc").value = opts.accents;
-  $("optPre").addEventListener("change", () => { opts.preprint = $("optPre").value; store.set("bibOpts", opts); render(); });
-  $("optAcc").addEventListener("change", () => { opts.accents = $("optAcc").value; store.set("bibOpts", opts); render(); });
-  $("copy").addEventListener("click", async () => {
-    const t = $("out").value; let ok = false;
+  $("q").addEventListener("keydown", e => { if(e.key === "Enter" && (e.metaKey || e.ctrlKey)){ e.preventDefault(); run($("q").value); } });
+  $("optKey").value = opts.keyStyle; $("optVen").value = opts.venueStyle; $("optPre").value = opts.preprint; $("optAcc").value = opts.accents;
+  const onOpt = () => { store.set("bibOpts", opts); items.forEach(it => { if(it.R) renderItem(it); }); rebuildOutput(); reformat(); };
+  $("optVen").addEventListener("change", () => { opts.venueStyle = $("optVen").value; onOpt(); });
+  $("optKey").addEventListener("change", () => { opts.keyStyle = $("optKey").value; items.forEach(it => { if(!it.keyEdited) it.key = ""; }); onOpt(); });
+  $("optPre").addEventListener("change", () => { opts.preprint = $("optPre").value; onOpt(); });
+  $("optAcc").addEventListener("change", () => { opts.accents = $("optAcc").value; onOpt(); });
+  const copier = (src, msg) => async () => {
+    const t = $(src).value; let ok = false;
     try{ await navigator.clipboard.writeText(t); ok = true; }
-    catch(e){ $("out").select(); try{ ok = document.execCommand("copy"); }catch(_){} }
-    $("copied").textContent = ok ? "Copied" : "Couldn't copy. Select the text and copy it manually.";
-    setTimeout(() => { $("copied").textContent = ""; }, 2500);
-  });
+    catch(e){ $(src).select(); try{ ok = document.execCommand("copy"); }catch(_){} }
+    $(msg).textContent = ok ? "Copied" : "Couldn't copy. Select the text and copy it manually.";
+    setTimeout(() => { $(msg).textContent = ""; }, 2500);
+  };
+  $("copy").addEventListener("click", copier("out", "copied"));
+  $("fcopy").addEventListener("click", copier("fout", "fcopied"));
+  $("fgo").addEventListener("click", reformat);
+  $("fin").addEventListener("input", reformat);
+  function showTab(t){
+    $("tabLookup").hidden = t !== "lookup"; $("tabFmt").hidden = t !== "fmt";
+    document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === t));
+    document.querySelectorAll(".lk").forEach(l => { l.hidden = t !== "lookup"; });
+  }
+  document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => showTab(b.dataset.tab)));
+  showTab("lookup");
 
   const qs = new URLSearchParams(location.search).get("q");
   if(qs){ $("q").value = qs; run(qs); }
