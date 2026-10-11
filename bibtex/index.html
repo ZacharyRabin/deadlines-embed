@@ -74,6 +74,24 @@ details.card[open]>summary::before{content:"\25BE"}
 details.log{margin-top:6px;color:var(--mute);font-size:12px}
 details.log summary{cursor:pointer}
 details.log pre{background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:6px 8px;white-space:pre-wrap;font:11.5px/1.45 ui-monospace,Menlo,monospace;margin:4px 0 0;max-height:120px;overflow:auto}
+
+/* Notion form under the input */
+details.formbox{margin-top:8px;border:1px solid var(--line);border-radius:8px;background:var(--panel);overflow:hidden}
+details.formbox>summary{display:flex;align-items:center;gap:8px;padding:6px 10px;cursor:pointer;list-style:none;color:var(--mute);font-size:12.5px;font-weight:600}
+details.formbox>summary::-webkit-details-marker{display:none}
+details.formbox>summary::before{content:"\25B8";font-size:11px;width:9px}
+details.formbox[open]>summary::before{content:"\25BE"}
+details.formbox[open]>summary{color:var(--text);border-bottom:1px solid var(--line)}
+details.formbox .fl{margin-left:auto;font-weight:500;color:var(--acc);text-decoration:none}
+details.formbox .fl:hover{text-decoration:underline}
+.fwrap{position:relative;height:440px;background:var(--panel2)}
+.fwrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:transparent}
+.fwrap .fload{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--mute);font-size:12.5px;animation:pulse 1.2s ease-in-out infinite;pointer-events:none}
+.fwrap.ready .fload{display:none}
+.fwrap .shield{position:absolute;inset:0;z-index:2;cursor:pointer;background:transparent;border:0;border-radius:0;padding:0}
+.fwrap.live .shield{display:none}
+.fwrap .hint{position:absolute;right:8px;bottom:8px;z-index:3;background:rgba(23,23,23,.82);color:var(--text);font-size:12px;padding:3px 9px;border-radius:99px;pointer-events:none}
+.fwrap.live .hint{display:none}
 @media(max-width:420px){.inview .row,.fview .row{flex-direction:column}.inview .right,.fview .right{width:auto;flex-direction:row;align-items:flex-end}}
 </style></head><body>
 <div id="viewIn" class="inview">
@@ -88,6 +106,10 @@ details.log pre{background:var(--panel);border:1px solid var(--line);border-radi
   </div>
   </div>
   <div id="msg" role="status"></div>
+  <details class="formbox" id="formbox" open>
+    <summary>Add a paper by hand<a class="fl" id="formLink" href="https://patch-snail-595.notion.site/3f6196f998ee8015955adda226b5d07a" target="_blank" rel="noopener" title="Open the form in its own tab">Open in new tab &#8599;</a></summary>
+    <div class="fwrap" id="fwrap"><div class="fload">Loading form&hellip;</div><button class="shield" id="fshield" type="button" aria-label="Click to use the form"></button><div class="hint">Click to use the form</div></div>
+  </details>
 </div>
 
 <div id="viewF" class="fview" hidden>
@@ -1005,6 +1027,26 @@ if(typeof document !== "undefined"){
     b.textContent = ok ? `Copied ${rd.length}` : "Couldn't copy";
     setTimeout(() => { b.textContent = "Copy all BibTeX"; }, 2000);
   });
+  // Notion form under the input: load the iframe once, only when the section is open; remember open/closed
+  (function(){
+    const box = $("formbox"), wrap = $("fwrap"); let loaded = false;
+    const FORM = "https://patch-snail-595.notion.site/ebd//3f6196f998ee8015955adda226b5d07a";
+    const load = () => {
+      if(loaded) return; loaded = true;
+      const f = document.createElement("iframe");
+      f.src = FORM; f.title = "Add a paper to Notion"; f.loading = "lazy"; f.setAttribute("allowfullscreen", "");
+      f.addEventListener("load", () => wrap.classList.add("ready"));
+      wrap.append(f);
+    };
+    const saved = store.get("bibCompactForm");
+    if(saved && saved.open === false) box.removeAttribute("open");
+    if(box.open) load();
+    box.addEventListener("toggle", () => { store.set("bibCompactForm", {open: box.open}); if(box.open) load(); });
+    $("formLink").addEventListener("click", e => e.stopPropagation());
+    // scroll shield: the page scrolls normally over the form until you click it; it re-arms when the pointer leaves
+    $("fshield").addEventListener("click", () => wrap.classList.add("live"));
+    wrap.addEventListener("mouseleave", () => wrap.classList.remove("live"));
+  })();
   const qs = new URLSearchParams(location.search).get("q");
   if(qs){ $("q").value = qs; collect(qs); }
 }
