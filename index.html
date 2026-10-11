@@ -1,208 +1,1047 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>arXiv to BibTeX (compact)</title>
 <style>
-:root{--bg:#191919;--card:#252525;--text:#e6e6e6;--mute:#9b9b9b;--warn:#f0a35e;--hot:#ff6b6b}
+:root{--bg:#171717;--panel:#202020;--panel2:#262626;--line:#333;--text:#ececec;--mute:#a0a0a0;
+  --acc:#8aa4ff;--ok:#6fe0b5;--warn:#ffcf70;--bad:#ff8a7a}
 *{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:13px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+body{padding:8px 10px 12px;min-height:100vh}
+button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--text);padding:5px 11px;white-space:nowrap}
+button:hover{border-color:#555}
+button.primary{background:var(--acc);border-color:transparent;color:#10131f;font-weight:600}
+button.primary:hover{filter:brightness(1.08)}
+button:disabled{opacity:.55;cursor:default}
+button:focus-visible,textarea:focus,select:focus{outline:2px solid var(--acc);outline-offset:1px}
+select,textarea{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:8px;font:inherit;padding:5px 8px}
 [hidden]{display:none!important}
-body{margin:0;padding:12px;background:var(--bg);color:var(--text);font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-#bar{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:10px}
-#cats{display:contents}
-#gear{background:#252525;border:1px solid #333;border-radius:8px;color:var(--text);font-size:20px;line-height:1;padding:5px 10px;cursor:pointer}
-#gear:hover{background:#2e2e2e}
-.sep{width:1px;height:20px;background:#333;margin:0 4px}
-.chip{background:transparent;border:1px solid #3a3a3a;border-radius:999px;color:var(--mute);font:inherit;font-size:12.5px;padding:5px 12px;cursor:pointer;white-space:nowrap}
-.chip:hover{color:var(--text);border-color:#555}
-.chip.on{background:rgba(110,168,254,.18);border-color:#6ea8fe;color:#d6e6ff}
-.chip.part{border:1px dashed #6ea8fe;color:#b9d3ff}
-.card{background:var(--card);border-radius:10px;padding:10px 14px;margin-bottom:8px;display:flex;justify-content:space-between;gap:12px;align-items:center}
-.name{font-weight:600}
-.meta{color:var(--mute);font-size:12px}
-.count{font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
-.warn .count{color:var(--warn)} .hot .count{color:var(--hot)}
-a{color:inherit;text-decoration:none}
-.badge{font-size:11px;color:var(--warn);margin-left:6px;font-weight:400}
-#msg{color:var(--mute);padding:8px}
-#panel{position:fixed;inset:8px;background:#202020;border:1px solid #333;border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px;z-index:5}
-#q{width:100%;padding:7px 10px;background:#2b2b2b;border:1px solid #3a3a3a;border-radius:6px;color:var(--text);font:inherit}
-#opts{flex:1;overflow-y:auto;columns:2 140px}
-.opt{display:block;padding:3px 0;cursor:pointer;break-inside:avoid}
-.foot{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--mute)}
-#done{background:#3a3a3a;color:var(--text);border:0;border-radius:6px;padding:6px 14px;cursor:pointer;font:inherit}
+
+/* input view: textarea on the left, controls on the right */
+.inview,.fview{display:flex;flex-direction:column;gap:4px}
+.inview .row,.fview .row{display:flex;gap:10px;align-items:stretch}
+.inview .left,.fview .left{flex:1;min-width:0;display:flex;flex-direction:column}
+.tabs{display:flex;gap:14px;border-bottom:1px solid var(--line);margin-bottom:2px}
+.tab{background:none;border:0;border-bottom:2px solid transparent;border-radius:0;padding:0 1px 1px;font-size:14px;font-weight:600;line-height:20px;color:var(--mute);letter-spacing:-.01em;margin-bottom:-1px}
+.tab:hover{color:var(--text);border-color:transparent}
+.tab.on{color:var(--text);border-bottom-color:var(--acc)}
+#fout{width:100%;height:calc(100vh - 62px);min-height:110px;resize:none;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre;overflow:auto}
+#frep{font-size:12px;color:var(--mute);margin:0 0 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#frep.warnl{color:var(--warn)}
+.inview textarea,.fview textarea.fin{flex:1;min-height:92px;resize:none;font:12.5px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre;overflow:auto}
+.inview .right,.fview .right{display:flex;flex-direction:column;gap:8px;justify-content:space-between;width:150px}
+.inview .right label,.fview .right label{display:flex;flex-direction:column;gap:3px;color:var(--mute);font-size:12px}
+.inview .right button,.fview .right button{padding:9px 11px}
+#msg,#fmsg{color:var(--bad);min-height:16px;font-size:12px}
+
+/* results view */
+.bar{display:flex;gap:10px;align-items:center;margin-bottom:8px}
+.pw{flex:1;min-width:0}
+.pbar{height:7px;background:var(--panel2);border:1px solid var(--line);border-radius:99px;overflow:hidden}
+.pbar i{display:block;height:100%;width:0;background:var(--acc);border-radius:99px;transition:width .35s}
+.pw.running .pbar i{background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.3) 0 7px,transparent 7px 14px);background-size:20px 20px;animation:stripe .8s linear infinite}
+@keyframes stripe{to{background-position:20px 0}}
+.pw.done .pbar i{background:var(--ok)}
+.ptext{margin-top:3px;font-size:12.5px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ptext b{font-variant-numeric:tabular-nums}
+.ptext .s2{color:var(--mute)}
+#gaps{color:var(--warn);font-size:12px;margin:-2px 0 6px}
+
+details.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;margin-bottom:5px}
+details.card>summary{display:flex;align-items:center;gap:7px;padding:5px 8px;cursor:pointer;list-style:none}
+details.card>summary::-webkit-details-marker{display:none}
+details.card>summary::before{content:"\25B8";color:var(--mute);font-size:11px;width:9px}
+details.card[open]>summary::before{content:"\25BE"}
+.ct{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ct b{font-weight:600}
+.ct span{color:var(--mute)}
+.badge{font-size:11px;border-radius:99px;padding:0 7px;background:#2a2418;color:var(--warn);border:1px solid #4a3d1e}
+.badge.bad{background:#2a1c1c;color:var(--bad);border-color:#4d2b2b}
+.cb{display:flex;gap:5px;align-items:center}
+.cb button{padding:2px 8px;font-size:12px;border-radius:7px}
+.cm{color:var(--ok);font-size:12px;min-width:44px;text-align:right}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--acc);animation:pulse 1s ease-in-out infinite}
+.dot.wait{background:#666;animation:none}
+@keyframes pulse{50%{opacity:.25}}
+.body{padding:2px 8px 8px}
+.cand{display:flex;gap:8px;align-items:flex-start;background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:5px 8px;margin-bottom:4px;cursor:pointer}
+.cand.on{border-color:var(--acc)}
+.cand input{margin-top:3px;accent-color:var(--acc)}
+.cand .t{font-weight:600}
+.cand .m{color:var(--mute);font-size:12px}
+.cand .m b{color:var(--text);font-weight:500}
+.warn{background:#2a2418;border:1px solid #4a3d1e;color:var(--warn);border-radius:7px;padding:4px 8px;margin-bottom:4px;font-size:12px}
+details.log{margin-top:6px;color:var(--mute);font-size:12px}
+details.log summary{cursor:pointer}
+details.log pre{background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:6px 8px;white-space:pre-wrap;font:11.5px/1.45 ui-monospace,Menlo,monospace;margin:4px 0 0;max-height:120px;overflow:auto}
+
+/* Notion form under the input */
+details.formbox{margin-top:8px;border:1px solid var(--line);border-radius:8px;background:var(--panel);overflow:hidden}
+details.formbox>summary{display:flex;align-items:center;gap:8px;padding:6px 10px;cursor:pointer;list-style:none;color:var(--mute);font-size:12.5px;font-weight:600}
+details.formbox>summary::-webkit-details-marker{display:none}
+details.formbox>summary::before{content:"\25B8";font-size:11px;width:9px}
+details.formbox[open]>summary::before{content:"\25BE"}
+details.formbox[open]>summary{color:var(--text);border-bottom:1px solid var(--line)}
+details.formbox .fl{margin-left:auto;font-weight:500;color:var(--acc);text-decoration:none}
+details.formbox .fl:hover{text-decoration:underline}
+.fwrap{position:relative;height:440px;background:var(--panel2)}
+.fwrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:transparent}
+.fwrap .fload{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--mute);font-size:12.5px;animation:pulse 1.2s ease-in-out infinite;pointer-events:none}
+.fwrap.ready .fload{display:none}
+@media(max-width:420px){.inview .row,.fview .row{flex-direction:column}.inview .right,.fview .right{width:auto;flex-direction:row;align-items:flex-end}}
 </style></head><body>
-<div id="bar">
-  <button id="gear" title="Choose conferences" aria-label="Choose conferences">⚙</button>
-  <button id="resetBtn" class="chip">Reset filters</button>
-  <span class="sep"></span>
-  <div id="cats"></div>
+<div id="viewIn" class="inview">
+  <div class="tabs" role="tablist"><button class="tab on" data-tab="n" role="tab" type="button">arXiv to Notion</button><button class="tab" data-tab="b" role="tab" type="button">BibTeX converter</button></div>
+  <div class="row">
+  <div class="left">
+    <textarea id="q" placeholder="arXiv links or IDs, one per line" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="arXiv links or IDs, one per line"></textarea>
+  </div>
+  <div class="right">
+    <label>Venue names<select id="optVen"><option value="full">Full titles</option><option value="abbr">Abbreviations</option></select></label>
+    <button id="go" class="primary" type="button">Collect</button>
+  </div>
+  </div>
+  <div id="msg" role="status"></div>
+  <details class="formbox" id="formbox" open>
+    <summary>Add a paper by hand<a class="fl" id="formLink" href="https://patch-snail-595.notion.site/3f6196f998ee8015955adda226b5d07a" target="_blank" rel="noopener" title="Open the form in its own tab">Open in new tab &#8599;</a></summary>
+    <div class="fwrap" id="fwrap"><div class="fload">Loading form&hellip;</div></div>
+  </details>
 </div>
-<div id="list"><div id="msg">Loading…</div></div>
-<div id="panel" hidden>
-  <input id="q" placeholder="Search conferences…">
-  <div id="opts"></div>
-  <div class="foot"><span>Changes save automatically</span><button id="done">Done</button></div>
+
+<div id="viewF" class="fview" hidden>
+  <div class="tabs" role="tablist"><button class="tab" data-tab="n" role="tab" type="button">arXiv to Notion</button><button class="tab on" data-tab="b" role="tab" type="button">BibTeX converter</button></div>
+  <div class="row">
+  <div class="left">
+    <textarea id="fin" class="fin" placeholder="Paste BibTeX entries or a whole .bib file" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="BibTeX to convert"></textarea>
+  </div>
+  <div class="right">
+    <label>Venue names<select id="optVen2"><option value="full">Full titles</option><option value="abbr">Abbreviations</option></select></label>
+    <button id="fgo" class="primary" type="button">Convert</button>
+  </div>
+  </div>
+  <div id="fmsg" role="status"></div>
+</div>
+
+<div id="viewFR" hidden>
+  <div class="bar">
+    <button id="fback" type="button" title="Back to the input box and start over">&larr; New</button>
+    <div id="frep" style="flex:1;min-width:0;margin:0"></div>
+    <button id="fcopy" class="primary" type="button">Copy BibTeX</button>
+  </div>
+  <textarea id="fout" readonly spellcheck="false" aria-label="Converted BibTeX"></textarea>
+</div>
+
+<div id="viewRes" hidden>
+  <div class="bar">
+    <button id="back" type="button" title="Back to the input box and start over">&larr; New</button>
+    <div class="pw running" id="pw"><div class="pbar"><i id="pfill"></i></div><div class="ptext" id="ptext"></div></div>
+    <button id="copyAll" class="primary" type="button">Copy all BibTeX</button>
+  </div>
+  <div id="gaps" hidden></div>
+  <div id="items"></div>
+  <details class="log"><summary>Connection log</summary><pre id="log"></pre></details>
 </div>
 <script>
-// ===== EDIT THESE =====
-const WATCH = ["NeurIPS","ICML","ICLR","CVPR","ICCV","ECCV","WACV","ICASSP","InterSpeech","AAAI"]; // default list
-const CATEGORIES = {                       // buttons in the top bar
-  "ML & AI":        ["NeurIPS","ICML","ICLR","AAAI","AISTATS","IJCAI","UAI"],
-  "Vision":         ["CVPR","ICCV","ECCV","WACV","BMVC","3DV"],
-  "NLP":            ["ACL","EMNLP","NAACL","EACL","COLING","COLM"],
-  "Speech & Audio": ["ICASSP","InterSpeech","ISMIR","WASPAA"]
-};
-const SHOW_PREDICTED = true;   // false hides unconfirmed dates
-const MAX_ROWS = 12;
-const URLS = ["https://mlciv.com/ai-deadlines/conferences.json",
-              "https://mlciv.com/ai-deadlines/api/upcoming.json"];
-const STORE_KEY = "deadlineWatch";
-// ======================
+"use strict";
+/* =====================================================================
+   CORE (pure functions; no DOM). Tested in Node with mock responses.
+   ===================================================================== */
 
-const $ = id => document.getElementById(id);
-const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const nameOf = s => String(s||"").toLowerCase().replace(/[^a-z]/g,"");
+// ---------- small text helpers ----------
+const norm = s => String(s == null ? "" : s).normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+const asciiOnly = s => String(s == null ? "" : s).normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9]/g, "");
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-// --- saved selection (localStorage may be blocked inside embeds) ---
-function loadSaved(){ try{ const v = JSON.parse(localStorage.getItem(STORE_KEY)); return Array.isArray(v) ? v : null; }catch(e){ return null; } }
-function save(){ try{ localStorage.setItem(STORE_KEY, JSON.stringify([...selected])); }catch(e){} }
-function clearSaved(){ try{ localStorage.removeItem(STORE_KEY); }catch(e){} }
-let selected = new Set(loadSaved() || WATCH.map(nameOf));
-
-// --- time handling ---
-function offsetMs(tz, ts){
-  const f = new Intl.DateTimeFormat("en-US",{timeZone:tz,hourCycle:"h23",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit"});
-  const p = Object.fromEntries(f.formatToParts(new Date(ts)).map(x=>[x.type,x.value]));
-  return Date.UTC(+p.year,+p.month-1,+p.day,+p.hour,+p.minute,+p.second) - ts;
-}
-function parseDeadline(str, tz){
-  if(!str || /tb[ad]/i.test(str)) return null;
-  const m = String(str).match(/(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?/);
-  if(!m) return null;
-  const wall = Date.UTC(+m[1],+m[2]-1,+m[3],+(m[4]||23),+(m[5]||59),+(m[6]||59));
-  tz = String(tz||"UTC-12").trim();
-  if(/^aoe$/i.test(tz)) return wall + 12*36e5;
-  const u = tz.match(/^(?:UTC|GMT)\s*([+-])\s*(\d{1,2})(?::?(\d{2}))?$/i);
-  if(u) return wall - (u[1]==="-"?-1:1)*(+u[2]*60 + (+u[3]||0))*60e3;
-  try{ let t = wall - offsetMs(tz, wall); t = wall - offsetMs(tz, t); return t; }
-  catch(e){ return wall + 12*36e5; }
+function ordinal(n){
+  const s = ["th", "st", "nd", "rd"], v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
 
-// --- data ---
-let DATA = [], ALL = new Map(), rows = [];
-async function load(){
-  for(const u of URLS){
-    try{ const r = await fetch(u,{cache:"no-store"}); if(r.ok) return await r.json(); }catch(e){}
+// ---------- arXiv ID ----------
+function parseArxivId(input){
+  let s = String(input || "").trim();
+  if(!s) return null;
+  s = s.replace(/10\.48550\/arxiv\./ig, "arxiv:");
+  let m = s.match(/(?:^|[^0-9.])(\d{2})(0[1-9]|1[0-2])\.(\d{4,5})(?:v\d+)?(?![0-9])/);
+  if(m){
+    const ym = +(m[1] + m[2]);                       // IDs up to 1412 have 4-digit numbers, from 1501 on 5 digits
+    const need = ym <= 1412 ? 4 : 5;
+    return (ym >= 704 && m[3].length === need) ? `${m[1]}${m[2]}.${m[3]}` : null;
   }
-  throw new Error("fetch failed");
+  m = s.match(/(?:^|[^a-z\-])([a-z]+(?:-[a-z]+)?(?:\.[A-Za-z]{2})?\/\d{7})(?:v\d+)?(?![0-9])/i);
+  if(m) return m[1];
+  return null;
 }
-function candidates(c){
-  const out = [], tz = c.timezone;
-  const add = (label, v) => {
-    const s = (v && typeof v==="object") ? (v.date||v.deadline) : v;
-    const t = parseDeadline(s, tz);
-    if(t) out.push({label, t});
-  };
-  add("Abstract", c.abstract_deadline);
-  (Array.isArray(c.deadline) ? c.deadline : [c.deadline]).forEach(v => add("Paper", v));
+function yearFromArxivId(id){
+  let m = String(id).match(/^(\d{2})(\d{2})\./);
+  if(m) return 2000 + (+m[1]);
+  m = String(id).match(/\/(\d{2})(\d{2})\d{3}$/);
+  if(m){ const yy = +m[1]; return yy >= 91 ? 1900 + yy : 2000 + yy; }
+  return null;
+}
+
+// ---------- names ----------
+const PARTICLES = new Set(["van","von","der","den","de","del","della","di","da","dos","das","du","la","le","ten","ter","bin","ibn","al","el"]);
+function splitName(full){
+  full = String(full || "").replace(/\s+\d{4}$/, "").replace(/\s+/g, " ").trim();   // DBLP disambiguation number
+  if(full.includes(",")){
+    const i = full.indexOf(",");
+    return {last: full.slice(0, i).trim(), first: full.slice(i + 1).trim(), suffix: ""};
+  }
+  const toks = full.split(" ").filter(Boolean);
+  let suffix = "";
+  if(toks.length > 1 && /^(jr\.?|sr\.?|ii|iii|iv)$/i.test(toks[toks.length - 1])) suffix = toks.pop();
+  if(toks.length <= 1) return {last: toks[0] || "", first: "", suffix};
+  let i = toks.length - 1;
+  while(i > 1 && PARTICLES.has(toks[i - 1].toLowerCase())) i--;
+  return {last: toks.slice(i).join(" "), first: toks.slice(0, i).join(" "), suffix};
+}
+function formatAuthor(name){
+  const p = splitName(name);
+  if(!p.first) return "{" + p.last + "}";
+  return p.suffix ? `${p.last}, ${p.suffix}, ${p.first}` : `${p.last}, ${p.first}`;
+}
+
+// ---------- LaTeX encoding ----------
+const COMB = {"\u0300":"`","\u0301":"'","\u0302":"^","\u0303":"~","\u0308":'"',"\u0304":"=","\u0307":"."};
+const COMB_L = {"\u030a":"r","\u0327":"c","\u030c":"v","\u0306":"u","\u030b":"H","\u0328":"k"};
+const SPECIAL = {"ł":"{\\l}","Ł":"{\\L}","ø":"{\\o}","Ø":"{\\O}","ß":"{\\ss}","æ":"{\\ae}","Æ":"{\\AE}","œ":"{\\oe}","Œ":"{\\OE}","ı":"{\\i}"};
+const GREEK = {"α":"alpha","β":"beta","γ":"gamma","δ":"delta","ε":"epsilon","ζ":"zeta","η":"eta","θ":"theta","λ":"lambda","μ":"mu","π":"pi","ρ":"rho","σ":"sigma","τ":"tau","φ":"phi","χ":"chi","ψ":"psi","ω":"omega","Δ":"Delta","Σ":"Sigma","Ω":"Omega","Φ":"Phi","Θ":"Theta","Λ":"Lambda","Π":"Pi","Ψ":"Psi"};
+
+function accentize(s){
+  let out = "";
+  for(const ch of String(s)){
+    if(ch.charCodeAt(0) < 128){ out += ch; continue; }
+    if(SPECIAL[ch]){ out += SPECIAL[ch]; continue; }
+    const d = ch.normalize("NFD");
+    if(d.length === 2){
+      let base = d[0]; const mk = d[1];
+      if(base === "i" || base === "j") base = "\\" + base;
+      if(COMB[mk]){ out += "{\\" + COMB[mk] + base + "}"; continue; }
+      if(COMB_L[mk]){ out += "{\\" + COMB_L[mk] + "{" + base + "}}"; continue; }
+    }
+    out += ch;
+  }
   return out;
 }
-function indexNames(){
-  ALL = new Map();
-  const now = Date.now();
-  for(const c of DATA){
-    const key = nameOf(c.title || c.id);
-    if(!key || ALL.has(key)) continue;
-    if(candidates(c).some(k => k.t > now)) ALL.set(key, String(c.title || c.id));
-  }
+function typo(s){
+  return s.replace(/[\u2018\u2019]/g, "'").replace(/\u201c/g, "``").replace(/\u201d/g, "''")
+    .replace(/\u2014/g, "---").replace(/[\u2013\u2212]/g, "--").replace(/\u2026/g, "...")
+    .replace(/\u00a0/g, " ").replace(/\u00d7/g, "$\\times$")
+    .replace(/[α-ωΔΣΩΦΘΛΠΨ]/g, c => GREEK[c] ? "$\\" + GREEK[c] + "$" : c);
 }
-function build(){
-  const now = Date.now(), best = new Map();
-  for(const c of DATA){
-    const key = nameOf(c.title || c.id);
-    if(!selected.has(key)) continue;
-    const predicted = /predicted/i.test(c.note||"");
-    if(predicted && !SHOW_PREDICTED) continue;
-    for(const k of candidates(c)){
-      if(k.t <= now) continue;
-      const cur = best.get(key);
-      if(!cur || k.t < cur.t) best.set(key, {c, t:k.t, label:k.label, predicted});
+// brace words whose capitalisation BibTeX styles would otherwise lower-case (DINO, ViT, ImageNet, 3D ...)
+function protectCaps(s){
+  return s.replace(/[A-Za-z0-9\u00C0-\u024F]+/g, w => {
+    if(/^.+[A-Z]/.test(w)) return "{" + w + "}";          // DINO, ViT, ImageNet, 3D
+    if(/\d/.test(w) && /[A-Z]/.test(w)) return "{" + w + "}";   // A100, V2
+    return w;
+  });
+}
+function tex(s, o){
+  o = o || {};
+  const parts = String(s == null ? "" : s).split(/(\$[^$]*\$)/);
+  let out = parts.map((p, i) => {
+    if(i % 2 === 1) return p;                              // leave $math$ alone
+    if(o.protect) p = protectCaps(p);
+    p = p.replace(/&/g, "\\&").replace(/%/g, "\\%").replace(/#/g, "\\#").replace(/_/g, "\\_")
+         .replace(/\$/g, "\\$").replace(/~/g, "\\textasciitilde{}").replace(/\^/g, "\\textasciicircum{}");
+    return typo(p);
+  }).join("");
+  if(o.accents !== "utf8") out = accentize(out);
+  return out;
+}
+const fixPages = p => String(p || "").trim().replace(/\s*[-\u2013\u2014]+\s*/g, "--");
+
+// ---------- venue table (edit this to change names) ----------
+// full(year) = the booktitle / journal name used in the entry. abbr is kept for a future abbreviation toggle.
+const VENUES = [
+  {id:"cvpr",  kind:"conf", dblp:["conf/cvpr"],  re:/\bcvpr\b|computer vision and pattern recognition/i, abbr:"CVPR", ws:true,
+   full:y => y >= 2019 ? "Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition" : "Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition"},
+  {id:"iccv",  kind:"conf", dblp:["conf/iccv"],  re:/\biccv\b|international conference on computer vision/i, abbr:"ICCV", ws:true,
+   full:y => y >= 2019 ? "Proceedings of the IEEE/CVF International Conference on Computer Vision" : "Proceedings of the IEEE International Conference on Computer Vision"},
+  {id:"eccv",  kind:"conf", dblp:["conf/eccv"],  re:/\beccv\b|european conference on computer vision/i, abbr:"ECCV", ws:true,
+   full:() => "European Conference on Computer Vision"},
+  {id:"wacv",  kind:"conf", dblp:["conf/wacv"],  re:/\bwacv\b|applications of computer vision/i, abbr:"WACV", ws:true,
+   full:y => y >= 2020 ? "Proceedings of the IEEE/CVF Winter Conference on Applications of Computer Vision" : "IEEE Winter Conference on Applications of Computer Vision"},
+  {id:"bmvc",  kind:"conf", dblp:["conf/bmvc"],  re:/\bbmvc\b|british machine vision conference/i, abbr:"BMVC", full:() => "British Machine Vision Conference"},
+  {id:"3dv",   kind:"conf", dblp:["conf/3dim","conf/3dv"], re:/\b3dv\b|international conference on 3d vision/i, abbr:"3DV", full:() => "International Conference on 3D Vision"},
+  {id:"nips",  kind:"conf", dblp:["conf/nips"],  re:/\bneurips\b|\bnips\b|neural information processing systems/i, abbr:"NeurIPS", full:() => "Advances in Neural Information Processing Systems"},
+  {id:"icml",  kind:"conf", dblp:["conf/icml"],  re:/\bicml\b|international conference on machine learning/i, abbr:"ICML",
+   full:y => y >= 2015 ? `Proceedings of the ${ordinal(y - 1983)} International Conference on Machine Learning` : "International Conference on Machine Learning"},
+  {id:"iclr",  kind:"conf", dblp:["conf/iclr"],  re:/\biclr\b|international conference on learning representations/i, abbr:"ICLR", full:() => "International Conference on Learning Representations"},
+  {id:"aaai",  kind:"conf", dblp:["conf/aaai"],  re:/\baaai\b|aaai conference on artificial intelligence/i, abbr:"AAAI", full:() => "Proceedings of the AAAI Conference on Artificial Intelligence"},
+  {id:"ijcai", kind:"conf", dblp:["conf/ijcai"], re:/\bijcai\b|international joint conference on artificial intelligence/i, abbr:"IJCAI", full:() => "International Joint Conference on Artificial Intelligence"},
+  {id:"aistats",kind:"conf",dblp:["conf/aistats"],re:/aistats|artificial intelligence and statistics/i, abbr:"AISTATS", full:() => "International Conference on Artificial Intelligence and Statistics"},
+  {id:"uai",   kind:"conf", dblp:["conf/uai"],   re:/\buai\b|uncertainty in artificial intelligence/i, abbr:"UAI", full:() => "Conference on Uncertainty in Artificial Intelligence"},
+  {id:"acl",   kind:"conf", dblp:["conf/acl"],   re:/^acl\b|annual meeting of the association for computational linguistics/i, abbr:"ACL",
+   full:y => y >= 1963 ? `Proceedings of the ${ordinal(y - 1962)} Annual Meeting of the Association for Computational Linguistics` : "Annual Meeting of the Association for Computational Linguistics"},
+  {id:"emnlp", kind:"conf", dblp:["conf/emnlp"], re:/\bemnlp\b|empirical methods in natural language processing/i, abbr:"EMNLP", full:() => "Proceedings of the Conference on Empirical Methods in Natural Language Processing"},
+  {id:"naacl", kind:"conf", dblp:["conf/naacl"], re:/\bnaacl\b|north american chapter/i, abbr:"NAACL", full:() => "Proceedings of the Conference of the North American Chapter of the Association for Computational Linguistics: Human Language Technologies"},
+  {id:"icassp",kind:"conf", dblp:["conf/icassp"],re:/icassp|acoustics, speech and signal processing/i, abbr:"ICASSP", full:() => "IEEE International Conference on Acoustics, Speech and Signal Processing"},
+  {id:"interspeech",kind:"conf",dblp:["conf/interspeech"],re:/interspeech|international speech communication association/i, abbr:"Interspeech", full:() => "Interspeech"},
+  {id:"mm",    kind:"conf", dblp:["conf/mm"],    re:/acm multimedia|international conference on multimedia/i, abbr:"ACM MM", full:() => "Proceedings of the ACM International Conference on Multimedia"},
+  {id:"kdd",   kind:"conf", dblp:["conf/kdd"],   re:/\bkdd\b|knowledge discovery and data mining/i, abbr:"KDD", full:() => "Proceedings of the ACM SIGKDD International Conference on Knowledge Discovery & Data Mining"},
+  // journals
+  {id:"pami",  kind:"journal", dblp:["journals/pami"], re:/pattern anal|pattern analysis and machine intelligence|\btpami\b/i, abbr:"TPAMI", full:() => "IEEE Transactions on Pattern Analysis and Machine Intelligence"},
+  {id:"ijcv",  kind:"journal", dblp:["journals/ijcv"], re:/int\. j\. comput\. vis|international journal of computer vision|\bijcv\b/i, abbr:"IJCV", full:() => "International Journal of Computer Vision"},
+  {id:"tip",   kind:"journal", dblp:["journals/tip"],  re:/trans\. image process|transactions on image processing/i, abbr:"TIP", full:() => "IEEE Transactions on Image Processing"},
+  {id:"tnnls", kind:"journal", dblp:["journals/tnn"],  re:/neural networks learn|neural networks and learning systems/i, abbr:"TNNLS", full:() => "IEEE Transactions on Neural Networks and Learning Systems"},
+  {id:"tmlr",  kind:"journal", dblp:["journals/tmlr"], re:/trans\. mach\. learn\. res|transactions on machine learning research|\btmlr\b/i, abbr:"TMLR", full:() => "Transactions on Machine Learning Research"},
+  {id:"jmlr",  kind:"journal", dblp:["journals/jmlr"], re:/j\. mach\. learn\. res|journal of machine learning research|\bjmlr\b/i, abbr:"JMLR", full:() => "Journal of Machine Learning Research"},
+  {id:"pr",    kind:"journal", dblp:["journals/pr"],   re:/^pattern recogni/i, abbr:"Pattern Recognit.", full:() => "Pattern Recognition"},
+  {id:"nn",    kind:"journal", dblp:["journals/nn"],   re:/^neural networks$/i, abbr:"Neural Netw.", full:() => "Neural Networks"},
+  {id:"cviu",  kind:"journal", dblp:["journals/cviu"], re:/comput\. vis\. image underst|computer vision and image understanding|\bcviu\b/i, abbr:"CVIU", full:() => "Computer Vision and Image Understanding"},
+  {id:"csur",  kind:"journal", dblp:["journals/csur"], re:/comput\. surv|acm computing surveys/i, abbr:"CSUR", full:() => "ACM Computing Surveys"},
+  {id:"tcsvt", kind:"journal", dblp:["journals/tcsv"], re:/circuits and systems for video technology|circuits syst\. video/i, abbr:"TCSVT", full:() => "IEEE Transactions on Circuits and Systems for Video Technology"},
+  {id:"tmm",   kind:"journal", dblp:["journals/tmm"],  re:/trans\. multim|transactions on multimedia/i, abbr:"TMM", full:() => "IEEE Transactions on Multimedia"},
+  {id:"taslp", kind:"journal", dblp:["journals/taslp"],re:/audio, speech, and language processing|audio speech lang/i, abbr:"TASLP", full:() => "IEEE/ACM Transactions on Audio, Speech, and Language Processing"}
+];
+// ISO-style abbreviations for journals (conference abbreviations are the usual acronyms). Short forms stay recognised as alternates.
+const ISO = {pami:"IEEE Trans. Pattern Anal. Mach. Intell.", ijcv:"Int. J. Comput. Vis.", tip:"IEEE Trans. Image Process.", tnnls:"IEEE Trans. Neural Netw. Learn. Syst.",
+  tmlr:"Trans. Mach. Learn. Res.", jmlr:"J. Mach. Learn. Res.", pr:"Pattern Recognit.", nn:"Neural Netw.", cviu:"Comput. Vis. Image Underst.", csur:"ACM Comput. Surv.",
+  tcsvt:"IEEE Trans. Circuits Syst. Video Technol.", tmm:"IEEE Trans. Multimedia", taslp:"IEEE/ACM Trans. Audio, Speech, Lang. Process."};
+const ALTS = {
+  cvpr:["Proc. IEEE Conf. Comput. Vis. Pattern Recognit.","IEEE Conf. Comput. Vis. Pattern Recognit.","Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit."],
+  iccv:["Proc. IEEE Int. Conf. Comput. Vis.","Proc. IEEE/CVF Int. Conf. Comput. Vis.","Int. Conf. Comput. Vis."],
+  eccv:["Eur. Conf. Comput. Vis."], wacv:["Proc. IEEE Winter Conf. Appl. Comput. Vis.","IEEE Winter Conf. Appl. Comput. Vis."],
+  nips:["NIPS","Adv. Neural Inf. Process. Syst.","Neural Information Processing Systems"], icml:["Int. Conf. Mach. Learn."], iclr:["Int. Conf. Learn. Represent."],
+  mm:["ACM Multimedia","MM","ACM MM"], kdd:["SIGKDD","ACM SIGKDD"], aaai:["AAAI Conf. Artif. Intell."], ijcai:["Int. Joint Conf. Artif. Intell."],
+  acl:["Annu. Meet. Assoc. Comput. Linguist."], emnlp:["Empirical Methods in Natural Language Processing"],
+  pami:["TPAMI","PAMI","IEEE TPAMI"], ijcv:["IJCV"], tip:["IEEE TIP"], tnnls:["IEEE TNNLS","TNNLS"], tmlr:["TMLR"], jmlr:["JMLR"], cviu:["CVIU"],
+  csur:["ACM CSUR"], tcsvt:["IEEE TCSVT"], tmm:["IEEE TMM"], taslp:["IEEE/ACM TASLP","TASLP"]};
+const NOTION_LABEL = {tnnls: "IEEE TNNLS", pr: "Pattern Recognition", nn: "Neural Networks", mm: "ACM MM"};
+VENUES.forEach(v => { v.label = NOTION_LABEL[v.id] || v.abbr; v.alts = (ALTS[v.id] || []).slice(); if(ISO[v.id]){ v.alts.push(v.abbr); v.abbr = ISO[v.id]; } });
+function styleName(v, year, ws, style){
+  const n = style === "abbr" ? v.abbr : v.full(year || 0);
+  return ws ? n + " Workshops" : n;
+}
+const CANON_DROP = new Set(["proceedings","proc","of","the","and","ieee","cvf","acm","in","workshop","workshops"]);
+function canon(s){
+  return norm(String(s).replace(/\([^)]*\)/g, " ")).split(" ")
+    .filter(w => w && !CANON_DROP.has(w) && !/^\d+$/.test(w) && !/^\d+(st|nd|rd|th)$/.test(w)).join(" ");
+}
+let CANON_INDEX = null;
+function canonIndex(){
+  if(CANON_INDEX) return CANON_INDEX;
+  CANON_INDEX = new Map();
+  for(const v of VENUES){
+    const forms = [v.abbr].concat(v.alts);
+    for(let y = 1990; y <= 2035; y++) forms.push(v.full(y));
+    forms.forEach(f => { const k = canon(f); if(k && !CANON_INDEX.has(k)) CANON_INDEX.set(k, v); });
+  }
+  return CANON_INDEX;
+}
+// Strict matching for the reformatter: a whole venue string must equal a known venue (so "... Machine Learning and Applications" is not ICML).
+function matchVenueStrict(raw){
+  const s = String(raw || "").replace(/\\&/g, "&").replace(/\\ /g, " ").replace(/[{}]/g, "").replace(/\s+/g, " ").trim();
+  if(!s) return {skip: "empty"};
+  if(/arxiv|\bcorr\b|preprint/i.test(s)) return {skip: "preprint"};
+  let ws = false;
+  if(/workshops?\b/i.test(s)){
+    if(/workshops?\s*(\([^)]*\))?\s*$/i.test(s) && !/workshops?\s+(on|for)\b/i.test(s)) ws = true;
+    else return {skip: "named workshop, left as written"};
+  }
+  const v = canonIndex().get(canon(s));
+  if(!v) return null;
+  if(ws && !v.ws) return {skip: "workshops of a venue not in the table"};
+  return {v, ws};
+}
+function readBalanced(s, i){            // s[i] is "{"; returns the index just after its matching "}", or -1
+  let d = 0;
+  for(let k = i; k < s.length; k++){
+    const ch = s[k];
+    if(ch === "\\"){ k++; continue; }
+    if(ch === "{") d++; else if(ch === "}"){ d--; if(d === 0) return k + 1; }
+  }
+  return -1;
+}
+// Rewrites only the booktitle / journal values; everything else in the file is left exactly as it was.
+function formatBib(text, o){
+  const style = o.venueStyle === "abbr" ? "abbr" : "full";
+  text = String(text || "");
+  let out = "", i = 0, nEntries = 0, nSame = 0, nPre = 0, noYear = 0;
+  const changes = [], unrec = new Map();
+  while(i < text.length){
+    const at = text.indexOf("@", i);
+    if(at < 0){ out += text.slice(i); break; }
+    out += text.slice(i, at);
+    const m = /^@\s*([A-Za-z]+)\s*([{(])/.exec(text.slice(at, at + 60));
+    if(!m){ out += "@"; i = at + 1; continue; }
+    const open = at + m[0].length - 1;
+    let end;
+    if(m[2] === "{") end = readBalanced(text, open);
+    else { end = text.indexOf(")", open); end = end < 0 ? -1 : end + 1; }
+    if(end < 0){ out += text.slice(at); break; }
+    let entry = text.slice(at, end);
+    i = end;
+    if(["comment","string","preamble"].includes(m[1].toLowerCase())){ out += entry; continue; }
+    const ob = m[0].length - 1, bodyEnd = entry.length - 1;
+    let p = entry.indexOf(",", ob);
+    if(p < 0){ out += entry; continue; }
+    nEntries++;
+    const key = entry.slice(ob + 1, p).trim(); p++;
+    const fields = [];
+    while(p < bodyEnd){
+      const mm = /^[\s,]*([A-Za-z_][\w:.-]*)\s*=\s*/.exec(entry.slice(p, bodyEnd));
+      if(!mm) break;
+      const vs = p + mm[0].length; let ve;
+      if(entry[vs] === "{"){ ve = readBalanced(entry, vs); if(ve < 0) break; }
+      else if(entry[vs] === '"'){ let k = vs + 1, d = 0; for(; k < bodyEnd; k++){ const c = entry[k]; if(c === "\\"){ k++; continue; } if(c === "{") d++; else if(c === "}") d--; else if(c === '"' && d === 0) break; } ve = k + 1; }
+      else { let k = vs; while(k < bodyEnd && entry[k] !== ",") k++; ve = k; }
+      fields.push({name: mm[1].toLowerCase(), vs, ve}); p = ve;
     }
+    const val = f => { let v = entry.slice(f.vs, f.ve).trim(); if((v[0] === "{" && v.endsWith("}")) || (v[0] === '"' && v.endsWith('"'))) v = v.slice(1, -1); return v; };
+    const yf = fields.find(f => f.name === "year"), ym = yf && /\d{4}/.exec(val(yf));
+    const edits = [];
+    for(const f of fields.filter(f => f.name === "booktitle" || f.name === "journal")){
+      const raw = val(f), r = matchVenueStrict(raw), clean = raw.replace(/[{}]/g, "").replace(/\\&/g, "&").replace(/\s+/g, " ").trim();
+      if(r && r.skip === "preprint"){ nPre++; continue; }
+      if(!r || r.skip){ unrec.set(clean + (r ? "  (" + r.skip + ")" : ""), (unrec.get(clean + (r ? "  (" + r.skip + ")" : "")) || 0) + 1); continue; }
+      if(!ym) noYear++;
+      const name = styleName(r.v, ym ? +ym[0] : 2025, r.ws, style);
+      if(name === clean){ nSame++; continue; }
+      edits.push({vs: f.vs, ve: f.ve, text: "{" + tex(name, {accents: "latex"}) + "}"});
+      changes.push({key, from: clean, to: name});
+    }
+    edits.sort((a, b) => b.vs - a.vs).forEach(e => { entry = entry.slice(0, e.vs) + e.text + entry.slice(e.ve); });
+    out += entry;
   }
-  rows = [...best.values()].sort((a,b)=>a.t-b.t).slice(0, MAX_ROWS);
+  return {out, changes, unrec: [...unrec], nEntries, nSame, nPre, noYear};
 }
 
-// --- rendering ---
-function left(t, withSec){
-  let s = Math.max(0, Math.floor((t - Date.now())/1000));
-  const d = Math.floor(s/86400); s %= 86400;
-  if(d > 30) return `${d} days`;
-  const h = Math.floor(s/3600); s %= 3600;
-  const m = Math.floor(s/60); s %= 60;
-  return `${d}d ${String(h).padStart(2,"0")}h ${String(m).padStart(2,"0")}m` + (withSec ? ` ${String(s).padStart(2,"0")}s` : "");
+function matchVenue(dblpKey, raw){
+  const k = String(dblpKey || "").split("/").slice(0, 2).join("/");
+  if(k){ const v = VENUES.find(v => v.dblp.includes(k)); if(v) return v; }
+  const r = String(raw || "");
+  return VENUES.find(v => v.re.test(r)) || null;
 }
-function render(){
-  const el = $("list");
-  if(!selected.size){ el.innerHTML = '<div id="msg">No conferences selected. Click ⚙ or a category button.</div>'; return; }
-  if(!rows.length){ el.innerHTML = '<div id="msg">No upcoming deadlines found for your selection.</div>'; return; }
-  el.innerHTML = rows.map((r,i)=>{
-    const days = (r.t - Date.now())/864e5;
-    const cls = days < 3 ? "hot" : days < 14 ? "warn" : "";
-    const when = new Date(r.t).toLocaleString(undefined,{month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"});
-    const name = esc(`${r.c.title||r.c.id} ${r.c.year||""}`);
-    const link = r.c.link ? `<a href="${esc(r.c.link)}" target="_blank" rel="noopener">${name}</a>` : name;
-    return `<div class="card ${cls}">
-      <div><div class="name">${link}${r.predicted?'<span class="badge">predicted</span>':""}</div>
-      <div class="meta">${r.label} · ${when}</div></div>
-      <div class="count">${left(r.t, i===0)}</div></div>`;
-  }).join("");
+function venueName(c, o){
+  if(!c.v) return c.venueRaw || "";
+  return styleName(c.v, c.year, c.kind === "conf" && c.ws && c.v.ws, o && o.venueStyle);
 }
 
-// --- category buttons ---
-const catKeys = name => CATEGORIES[name].map(nameOf).filter(k => ALL.has(k));
-function renderBar(){
-  $("cats").innerHTML = Object.keys(CATEGORIES).map(name => {
-    const keys = catKeys(name);
-    const n = keys.filter(k => selected.has(k)).length;
-    const state = keys.length && n === keys.length ? "on" : n > 0 ? "part" : "";
-    const icon = state === "on" ? "✓ " : state === "part" ? "– " : "";
-    return `<button class="chip ${state}" data-cat="${esc(name)}" aria-pressed="${state==="on"}">${icon}${esc(name)}</button>`;
-  }).join("");
+// ---------- parsing API responses ----------
+function xmlDecode(s){
+  return String(s).replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(+n)).replace(/&amp;/g, "&");
 }
-$("cats").onclick = e => {
-  const b = e.target.closest("[data-cat]"); if(!b) return;
-  const keys = catKeys(b.dataset.cat); if(!keys.length) return;
-  const allOn = keys.every(k => selected.has(k));
-  keys.forEach(k => allOn ? selected.delete(k) : selected.add(k));
-  save(); build(); render(); renderBar();
-};
-$("resetBtn").onclick = () => {
-  clearSaved(); selected = new Set(WATCH.map(nameOf));
-  build(); render(); renderBar();
-};
-
-// --- settings panel ---
-function renderOpts(){
-  const q = $("q").value.trim().toLowerCase();
-  const items = [...ALL.entries()]
-    .filter(([k,n]) => !q || n.toLowerCase().includes(q) || k.includes(nameOf(q)))
-    .sort((a,b) => a[1].localeCompare(b[1]));
-  $("opts").innerHTML = items.map(([k,n]) =>
-    `<label class="opt"><input type="checkbox" data-k="${esc(k)}" ${selected.has(k)?"checked":""}> ${esc(n)}</label>`
-  ).join("") || '<div id="msg">No matches.</div>';
+function parseArxivAtom(xml){
+  const e = String(xml).match(/<entry>([\s\S]*?)<\/entry>/);
+  return e ? parseEntryBody(e[1]) : null;
 }
-$("gear").onclick = () => { $("panel").hidden = false; $("q").value = ""; renderOpts(); };
-$("done").onclick = () => { $("panel").hidden = true; renderBar(); };
-$("q").oninput = renderOpts;
-$("opts").onchange = e => {
-  const k = e.target.dataset.k; if(!k) return;
-  e.target.checked ? selected.add(k) : selected.delete(k);
-  save(); build(); render(); renderBar();
-};
+function parseArxivFeed(xml){            // several entries at once, keyed by arXiv ID (version stripped)
+  const map = {};
+  for(const e of String(xml).matchAll(/<entry>([\s\S]*?)<\/entry>/g)){
+    const idm = e[1].match(/<id>[^<]*?\/abs\/([^<\s]+?)(?:v\d+)?<\/id>/);
+    const r = parseEntryBody(e[1]);
+    if(idm && r) map[idm[1]] = r;
+  }
+  return map;
+}
+function parseEntryBody(b){
+  const one = tag => {
+    const m = b.match(new RegExp("<" + tag + "(?:\\s[^>]*)?>([\\s\\S]*?)</" + tag + ">"));
+    return m ? xmlDecode(m[1]).replace(/\s+/g, " ").trim() : "";
+  };
+  const title = one("title");
+  if(!title || /^error$/i.test(title)) return null;
+  const authors = [...b.matchAll(/<author>[\s\S]*?<name>([\s\S]*?)<\/name>[\s\S]*?<\/author>/g)]
+    .map(m => xmlDecode(m[1]).replace(/\s+/g, " ").trim()).filter(Boolean);
+  const pc = b.match(/<arxiv:primary_category[^>]*\bterm="([^"]+)"/);
+  const published = one("published");
+  return {title, authors, year: published ? +published.slice(0, 4) : null,
+          primaryClass: pc ? pc[1] : "", journalRef: one("arxiv:journal_ref"), doi: one("arxiv:doi"), abstract: one("summary")};
+}
 
-renderBar();
-load().then(d => {
-  DATA = Array.isArray(d) ? d : (d.conferences || Object.values(d).flat());
-  indexNames(); build(); render(); renderBar(); setInterval(render, 1000);
-}).catch(() => {
-  $("list").innerHTML = '<div id="msg">Could not load deadline data (the source may block cross-site requests).</div>';
-});
-</script></body></html>
+// ---------- matching ----------
+function titleSim(a, b){
+  const A = norm(a), B = norm(b);
+  if(!A || !B) return 0;
+  if(A === B) return 1;
+  const SA = new Set(A.split(" ")), SB = new Set(B.split(" "));
+  let inter = 0; SA.forEach(w => { if(SB.has(w)) inter++; });
+  return (2 * inter) / (SA.size + SB.size);
+}
+function lastNames(list){
+  return new Set((list || []).map(a => norm(splitName(a).last).replace(/ /g, "")).filter(Boolean));
+}
+function authorOverlap(a, b){
+  const A = lastNames(a), B = lastNames(b);
+  if(!A.size || !B.size) return 0;
+  let inter = 0; A.forEach(x => { if(B.has(x)) inter++; });
+  return inter / Math.min(A.size, B.size);
+}
+const STOP = new Set(["a","an","the","of","on","in","for","to","and","with","via","from","by","at","towards","toward","is","are","how","what","why","do","does","can","using","use"]);
+function makeKey(authors, year, title){
+  const last = asciiOnly(authors && authors[0] ? splitName(authors[0]).last : "").toLowerCase() || "unknown";
+  const word = norm(title).split(" ").find(w => w && !STOP.has(w)) || "";
+  return `${last}${year || ""}${word}`;
+}
+
+// ---------- smart citation keys ----------
+// Rules, in order: (1) an acronym in parentheses, "Open Set Recognition (OSR)" -> OSR; (2) the part before a colon or dash is the
+// method/topic name, "Swin Transformer: Hierarchical ..." -> SwinTransformer; (3) otherwise the first few content words.
+// Stop words are dropped, words are CamelCased, and capitals inside a word (SimGCD, ViT) are kept.
+const SHORT_STOP = new Set([...STOP, "novel","new","approach","its","as","or","be","than","that","this","these","those","into","over","your","our","their"]);
+function camelWords(words){ return words.map(w => w[0].toUpperCase() + w.slice(1)).join(""); }
+function titleTokens(t, dropStops){          // hyphenated words stay one unit: Fine-Tuning -> FineTuning
+  return String(t || "").split(/[\s\/,;:!?]+/)
+    .filter(w => w && !/[$\\]/.test(w))
+    .map(w => w.split(/[\-\u2010-\u2015]+/).map(asciiOnly).filter(Boolean).map(x => x[0].toUpperCase() + x.slice(1)).join("")).filter(Boolean)
+    .filter(w => !(dropStops && SHORT_STOP.has(w.toLowerCase())));
+}
+function takeWords(words, maxWords, maxLen){
+  const out = [];
+  for(const w of words){
+    if(out.length >= maxWords) break;
+    if(out.length && out.join("").length + w.length > maxLen) break;
+    out.push(w);
+  }
+  return out;
+}
+function shortName(title){
+  let t = String(title || "").replace(/\s+/g, " ").trim();
+  const sep = t.search(/\s*[:\u2013\u2014]\s+|\s+-\s+|\?\s+\S/);          // colon, en/em dash, " - ", or a question mark followed by more text
+  const head = sep > 0 ? t.slice(0, sep + (t[sep] === "?" ? 1 : 0)) : t;
+  const ac = head.match(/\(([A-Za-z][A-Za-z0-9+\-]{1,9})\)/);
+  if(ac && /[A-Z]/.test(ac[1].slice(1))) return asciiOnly(ac[1]);
+  const words = titleTokens(head.replace(/\([^)]*\)/g, " "), true);
+  if(!words.length) return titleTokens(t, false).slice(0, 3).map(w => w[0].toUpperCase() + w.slice(1)).join("");
+  const n = words.length <= 4 ? words.length : 3;
+  return camelWords(takeWords(words, n, 32));
+}
+function fullTitleName(title){
+  const words = titleTokens(String(title || "").replace(/\([^)]*\)/g, " "), false);
+  return camelWords(takeWords(words, 99, 60));
+}
+function makeKeyStyled(authors, year, title, style){
+  if(style === "short" || style === "short_year"){ const n = shortName(title); if(n) return n + (style === "short_year" ? (year || "") : ""); }
+  else if(style === "full"){ const n = fullTitleName(title); if(n) return n; }
+  return makeKey(authors, year, title);
+}
+
+// ---------- candidates ----------
+function candFromDblp(h){
+  const i = (h && h.info) || {};
+  const key = i.key || "", type = i.type || "";
+  if(/^journals\/corr\//.test(key) || /informal/i.test(type)) return null;
+  const isJ = key.startsWith("journals/") || /journal/i.test(type);
+  const isC = key.startsWith("conf/") || /conference/i.test(type);
+  if(!isJ && !isC) return null;
+  const venueRaw = [].concat(i.venue || []).join(", ");
+  const authors = [].concat((i.authors && i.authors.author) || []).map(a => typeof a === "string" ? a : (a && a.text)).filter(Boolean);
+  return {kind: isJ ? "journal" : "conf", source: "DBLP", dblpKey: key,
+    title: String(i.title || "").replace(/\.\s*$/, ""), authors,
+    year: i.year ? +i.year : null, v: matchVenue(key, venueRaw), venueRaw,
+    ws: isC && /workshop/i.test(venueRaw), pages: i.pages || "", volume: i.volume || "", number: i.number || "",
+    doi: i.doi && !/^10\.48550\//.test(i.doi) ? i.doi : ""};
+}
+function candFromS2(meta, s2){
+  if(!s2) return null;
+  const raw = s2.venue || (s2.publicationVenue && s2.publicationVenue.name) || "";
+  if(!raw || /arxiv|\bcorr\b|preprint/i.test(raw)) return null;
+  const v = matchVenue("", raw);
+  const jr = s2.journal || {};
+  const pvType = (s2.publicationVenue && s2.publicationVenue.type) || "";
+  const kind = v ? v.kind : (/journal/i.test(pvType) ? "journal" : "conf");
+  const ids = s2.externalIds || {};
+  const fromJr = !/arxiv/i.test(jr.name || "");
+  return {kind, source: "Semantic Scholar", dblpKey: "", title: s2.title || meta.title,
+    authors: meta.authors,                                   // same paper: keep the arXiv author list for the entry
+    s2Authors: (s2.authors || []).map(a => a && a.name).filter(Boolean), year: s2.year || null, v, venueRaw: raw,
+    ws: /workshop/i.test(raw), pages: fromJr ? (jr.pages || "") : "", volume: fromJr ? (jr.volume || "") : "", number: "",
+    doi: ids.DOI && !/^10\.48550\//.test(ids.DOI) ? ids.DOI : ""};
+}
+function candFromCrossref(it){
+  if(!it) return null;
+  const type = it.type || "", isJ = type === "journal-article", isC = type === "proceedings-article";
+  if(!isJ && !isC) return null;
+  const raw = [].concat(it["container-title"] || [])[0] || "";
+  const doi = it.DOI || "";
+  if(!raw || /arxiv|\bcorr\b/i.test(raw) || /^10\.48550\//.test(doi)) return null;
+  const strip = x => String(x || "").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+  const dp = it.issued && it.issued["date-parts"] && it.issued["date-parts"][0];
+  const v = matchVenue("", raw);
+  return {kind: isJ ? "journal" : "conf", source: "Crossref", dblpKey: "", title: strip([].concat(it.title || [])[0]),
+    authors: (it.author || []).map(a => [a.given, a.family].filter(Boolean).join(" ") || a.name || "").filter(Boolean),
+    year: dp && dp[0] ? +dp[0] : null, v, venueRaw: raw, ws: /workshop/i.test(raw),
+    pages: it.page || "", volume: it.volume || "", number: it.issue || "", doi};
+}
+function parseDatacite(txt){
+  const a = JSON.parse(txt).data.attributes;
+  const title = a.titles && a.titles[0] && a.titles[0].title;
+  if(!title) return null;
+  const authors = (a.creators || []).map(c => {
+    if(c.givenName && c.familyName) return c.givenName + " " + c.familyName;
+    const n = c.name || ""; return n.includes(",") ? n.split(",").map(x => x.trim()).reverse().join(" ") : n;
+  }).filter(Boolean);
+  const subj = (a.subjects || []).find(x => /arxiv/i.test(x.subjectScheme || ""));
+  const pc = subj && /\(([^)]+)\)\s*$/.exec(subj.subject || "");
+  const ab = (a.descriptions || []).find(d => /abstract/i.test(d.descriptionType || ""));
+  return {title: String(title).replace(/\s+/g, " ").trim(), authors, year: a.publicationYear ? +a.publicationYear : null, primaryClass: pc ? pc[1] : "",
+          abstract: ab && ab.description ? String(ab.description).replace(/\s+/g, " ").trim() : ""};
+}
+const SRC_RANK = {"DBLP": 0, "Crossref": 1, "Semantic Scholar": 2};
+function buildCandidates(meta, s2, dblp, cr){
+  const s2Dblp = (s2 && s2.externalIds && s2.externalIds.DBLP) || "";
+  let list = [];
+  for(const h of (dblp && dblp.hits) || []){ const c = candFromDblp(h); if(c) list.push(c); }
+  for(const it of (cr && cr.items) || []){ const c = candFromCrossref(it); if(c) list.push(c); }
+  const sc = candFromS2(meta, s2); if(sc) list.push(sc);
+  for(const c of list){
+    c.ts = titleSim(meta.title, c.title);
+    c.ov = authorOverlap(meta.authors, c.s2Authors || c.authors);
+    c.score = 0.7 * c.ts + 0.3 * c.ov + (c.dblpKey && c.dblpKey === s2Dblp ? 0.5 : 0);
+    c.name = venueName(c);
+    c.good = c.ts >= 0.85 && c.ov >= 0.5;
+  }
+  list = list.filter(c => c.ts >= 0.5 && c.ov >= 0.2);     // drop clear non-matches
+  list.sort((a, b) => b.score - a.score);
+  // the same venue and year from several sources is one candidate: keep the best source (DBLP > Crossref > Semantic Scholar)
+  const rank = c => (c.good ? 0 : 10) + (SRC_RANK[c.source] || 0);
+  const kept = new Map();
+  for(const c of list){
+    const k = (c.v ? c.v.id : norm(c.venueRaw)) + "|" + (c.year || "") + "|" + (c.ws ? "w" : "");
+    const old = kept.get(k);
+    if(!old || rank(c) < rank(old)) kept.set(k, c);
+  }
+  list = list.filter(c => [...kept.values()].includes(c));
+  list = list.slice(0, 6);
+  list.push({kind: "preprint", source: "arXiv", title: meta.title, authors: meta.authors, year: meta.year, name: "", good: true, ts: 1, ov: 1, score: 0});
+  return list;
+}
+function defaultSelection(cands){
+  const i = cands.findIndex(c => c.kind !== "preprint" && c.good);
+  return i >= 0 ? i : cands.length - 1;
+}
+
+// ---------- output ----------
+function buildBib(meta, c, key, opts){
+  const T = (s, o) => tex(s, Object.assign({accents: opts.accents}, o || {}));
+  const lines = [];
+  const add = (k, v) => { if(v !== undefined && v !== null && String(v).trim() !== "") lines.push(`  ${k}={${v}}`); };
+  const authors = (c.kind !== "preprint" && c.authors && c.authors.length) ? c.authors : meta.authors;
+  const authorStr = authors.map(a => T(formatAuthor(a))).join(" and ");
+  let type;
+  if(c.kind === "conf"){
+    type = "inproceedings";
+    add("title", T(c.title, {protect: true})); add("author", authorStr); add("booktitle", T(venueName(c, opts)));
+    add("pages", fixPages(c.pages)); add("year", c.year); add("doi", c.doi);
+  } else if(c.kind === "journal"){
+    type = "article";
+    add("title", T(c.title, {protect: true})); add("author", authorStr); add("journal", T(venueName(c, opts)));
+    add("volume", T(c.volume)); add("number", T(c.number)); add("pages", fixPages(c.pages)); add("year", c.year); add("doi", c.doi);
+  } else if(opts.preprint === "article"){
+    type = "article";
+    add("title", T(meta.title, {protect: true})); add("author", authorStr);
+    add("journal", `arXiv preprint arXiv:${meta.id}`); add("year", meta.year);
+  } else {
+    type = "misc";
+    add("title", T(meta.title, {protect: true})); add("author", authorStr); add("year", meta.year);
+    add("eprint", meta.id); add("archivePrefix", "arXiv"); add("primaryClass", meta.primaryClass);
+  }
+  return `@${type}{${key},\n${lines.join(",\n")}\n}`;
+}
+function keyFor(meta, c, style){
+  const preprint = c.kind === "preprint";
+  return makeKeyStyled(preprint ? meta.authors : (c.authors.length ? c.authors : meta.authors),
+                 preprint ? meta.year : c.year, preprint ? meta.title : c.title, style || "author");
+}
+const STATE_WORDS = {ratelimited: "rate limited", unreadable: "blocked or errored", unreachable: "unreachable", timeout: "timed out", error: "server error", network: "failed", skipped: "skipped after a rate limit"};
+function gapText(gaps){ return gaps.map(g => `${g.name} ${STATE_WORDS[g.state] || g.state}`).join(", "); }
+function warningsFor(meta, c, ctx){
+  const w = [];
+  const gaps = ctx.gaps || [];
+  if(c.kind === "preprint"){
+    if(gaps.length) w.push(`Couldn't finish checking for a published version (${gapText(gaps)}), so one may exist that wasn't found. Try again in a minute.`);
+    if(ctx.anyPublished) w.push("Possible published versions are listed above, but none matched the arXiv title and authors closely enough to pick automatically. If one of them is your paper, select it.");
+    else if(!gaps.length) w.push("No published version found. If this paper was published, it may be too new, or the title changed. Check the paper's page.");
+    if(meta.journalRef) w.push(`The authors' arXiv entry lists: "${meta.journalRef}". If that's what you're citing, none of the published matches above were found automatically.`);
+    return w;
+  }
+  if(c.ts < 1) w.push(`The published title differs from the arXiv title. The entry uses: "${c.title}".`);
+  if(c.ov < 0.8) w.push("The author lists don't fully agree between arXiv and the published record. Check the authors.");
+  if(!c.v) w.push(`I don't have a full name for the venue "${c.venueRaw}", so it is used as written. Check it, or add it to the venue table in the page source.`);
+  if(c.ws && c.v && !c.v.ws) w.push("This looks like a workshop paper. Check that the booktitle is right.");
+  if(/findings/i.test(c.venueRaw)) w.push("This looks like a Findings paper, which has its own proceedings title. Check the booktitle.");
+  if(c.kind === "journal" && (!c.pages || !c.volume)){
+    const miss = [!c.volume && "volume", !c.pages && "pages"].filter(Boolean).join(" and ");
+    w.push(`No ${miss} found for this journal article` + (gaps.length ? ` (${gapText(gaps)}).` : "."));
+  }
+  if(c.year && meta.year && Math.abs(c.year - meta.year) > 2) w.push(`The published year (${c.year}) is far from the arXiv year (${meta.year}). Check that this is the right paper.`);
+  if(ctx.nStrong > 1) w.push("More than one published record matches (for example a conference paper and a journal extension). Make sure you picked the right one.");
+  return w;
+}
+function provenance(meta, c, opts){
+  const rows = [];
+  if(c.kind === "preprint"){
+    rows.push(["Title", meta.title, meta.src], ["Authors", meta.authors.join("; "), meta.src], ["Year", meta.year, "arXiv ID / submission date"],
+              ["arXiv ID", meta.id, "your input"]);
+    if(meta.primaryClass) rows.push(["Category", meta.primaryClass, meta.src]);
+  } else {
+    rows.push(["Title", c.title, c.source], ["Authors", c.authors.join("; "), c.source],
+              ["Venue", venueName(c, opts) + (c.v ? "  (name from the page's venue table)" : "  (as written by the source)"), c.source],
+              ["Year", c.year, c.source]);
+    if(c.pages) rows.push(["Pages", c.pages, c.source]);
+    if(c.volume) rows.push(["Volume / number", c.volume + (c.number ? " / " + c.number : ""), c.source]);
+    if(c.doi) rows.push(["DOI", c.doi, c.source]);
+  }
+  const ks = opts && opts.keyStyle;
+  rows.push(["Citation key", "", ks === "full" ? "title in CamelCase" : ks === "short" || ks === "short_year" ? "short name from the title" + (ks === "short_year" ? " + year" : "") : "first author, year, first title word"]);
+  return rows;
+}
+
+// ---------- one-line record for pasting into Notion ----------
+// Fields in order: Name, Authors, Conference, Year, Link, Abstract, BibTeX. Separator is the currency sign (U+00A4), which almost never
+// appears in papers; line breaks inside a field are written as the pilcrow (U+00B6). Both characters are stripped from the data itself.
+const NOTION_SEP = "¤", NOTION_NL = "¶";
+function notionLabel(meta, c){
+  if(c.kind === "preprint") return "arXiv preprint";
+  const base = c.v ? c.v.label + (c.kind === "conf" && c.ws && c.v.ws ? " Workshops" : "") : (c.venueRaw || "arXiv preprint");
+  return base.replace(/[,¤]/g, " ").replace(/\s+/g, " ").trim();      // a comma would split a multi-select value
+}
+function notionRecord(meta, c, bib){
+  const pub = c.kind !== "preprint";
+  const clean = x => String(x == null ? "" : x).replace(/[¤¶]/g, " ").replace(/\s+/g, " ").trim();
+  const authors = (pub && c.authors && c.authors.length ? c.authors : meta.authors).map(a => clean(a).replace(/\s+\d{4}$/, "")).join(", ");
+  return [clean(pub ? c.title : meta.title), authors, notionLabel(meta, c), (pub && c.year) || meta.year || "", "https://arxiv.org/abs/" + meta.id,
+          clean(meta.abstract), String(bib).replace(/\r?\n/g, NOTION_NL).replace(/¤/g, " ")].join(NOTION_SEP);
+}
+
+// ---------- network orchestration (fetcher, cache, probe, delays are injectable for tests) ----------
+// Every call retries on rate limits, server errors, timeouts and network errors. A 404 is an answer ("not indexed"), never retried.
+// If a request dies at the network level, o.probe(url) tells "server answered but the browser couldn't read it" (typically an error
+// or rate-limit response without CORS headers) apart from "couldn't reach the server at all".
+function makeCaller(fetcher, log, o){
+  o = o || {};
+  const delays = o.delays || [800, 2200], wait = o.sleep || sleep, status = {};
+  async function call(name, url){
+    if(o.skip && o.skip.has(name)){ status[name] = {state: "skipped"}; return null; }
+    const hit = o.cache && !o.refresh ? o.cache.get(url) : null;
+    if(hit){ log(`CACHE ${name}: saved response from ${Math.max(1, Math.round((Date.now() - hit.t) / 60000))} min ago`); status[name] = {state: "ok", cached: true, ageMin: Math.max(1, Math.round((Date.now() - hit.t) / 60000))}; return {ok: true, status: 200, text: hit.text}; }
+    let last = "error", note = "";
+    for(let attempt = 0; attempt <= delays.length; attempt++){
+      const t0 = Date.now();
+      try{
+        const r = await fetcher(url), ms = Date.now() - t0;
+        if(r.ok){ log(`OK    ${name}: ${r.status} in ${ms} ms${attempt ? ` (attempt ${attempt + 1})` : ""}`); if(o.cache) o.cache.set(url, r.text); status[name] = {state: "ok", ms, attempts: attempt + 1}; return r; }
+        if(r.status === 404){ log(`MISS  ${name}: 404, not found`); status[name] = {state: "notfound"}; return null; }
+        last = r.status === 429 ? "ratelimited" : "error"; note = "HTTP " + r.status;
+        log(`WARN  ${name}: HTTP ${r.status}${attempt < delays.length ? ", retrying" : ""}`);
+      }catch(e){
+        last = e && e.name === "AbortError" ? "timeout" : "network"; note = last === "timeout" ? "timed out" : "request failed";
+        log(`WARN  ${name}: ${note}${attempt < delays.length ? ", retrying" : ""}`);
+      }
+      if(attempt < delays.length) await wait(delays[attempt]);
+    }
+    if(last === "network" && o.probe){ last = (await o.probe(url)) ? "unreadable" : "unreachable"; }
+    log(`FAIL  ${name}: ${last} (${note})`);
+    if(o.skip && last === "ratelimited" && name === "Semantic Scholar") o.skip.add(name);   // batch runs stop hammering a service that already said no
+    status[name] = {state: last, note};
+    return null;
+  }
+  call.status = status;
+  return call;
+}
+async function searchDblp(title, call){
+  const words = norm(title).split(" ").filter(Boolean);
+  for(const n of [12, 6]){
+    const q = words.slice(0, n).join(" ");
+    if(!q) continue;
+    const r = await call("DBLP", "https://dblp.org/search/publ/api?q=" + encodeURIComponent(q) + "&format=json&h=25");
+    if(!r) return {failed: true, hits: []};
+    let hits = [];
+    try{ const j = JSON.parse(r.text); hits = [].concat((j.result && j.result.hits && j.result.hits.hit) || []); }catch(e){}
+    if(hits.length) return {failed: false, hits};
+  }
+  return {failed: false, hits: []};
+}
+async function searchCrossref(meta, call){
+  const first = meta.authors[0] ? splitName(meta.authors[0]).last : "";
+  const url = "https://api.crossref.org/works?query.title=" + encodeURIComponent(meta.title) + (first ? "&query.author=" + encodeURIComponent(first) : "") +
+    "&rows=6&select=DOI,title,container-title,type,page,volume,issue,issued,author";
+  const r = await call("Crossref", url);
+  if(!r) return {failed: true, items: []};
+  try{ return {failed: false, items: (JSON.parse(r.text).message || {}).items || []}; }catch(e){ return {failed: true, items: []}; }
+}
+async function lookup(id, fetcher, log, o){
+  const call = makeCaller(fetcher, log, o);
+  const S2F = "title,year,venue,publicationVenue,externalIds,authors.name,journal,abstract";
+  const s2p = call("Semantic Scholar", `https://api.semanticscholar.org/graph/v1/paper/ARXIV:${id}?fields=${S2F}`);
+  let ax = null, src = "arXiv API";
+  if(o && o.axMap){ ax = o.axMap[id] || null; if(o.axStatus) call.status["arXiv API"] = o.axStatus; }     // batch: already fetched in one request
+  else { const axr = await call("arXiv API", `https://export.arxiv.org/api/query?id_list=${id}&max_results=1`); ax = axr ? parseArxivAtom(axr.text) : null; }
+  const s2r = await s2p;
+  let s2 = null;
+  if(s2r){ try{ s2 = JSON.parse(s2r.text); }catch(e){} if(s2 && !s2.title) s2 = null; }
+  if(!ax){                                    // arXiv itself unavailable: DataCite has the same record (title, authors, year, category)
+    const dr = await call("DataCite", "https://api.datacite.org/dois/10.48550/arxiv." + id);
+    if(dr){ try{ const d = parseDatacite(dr.text); if(d){ ax = Object.assign({journalRef: ""}, d); src = "DataCite"; } }catch(e){} }
+  }
+  if(!ax && !s2) throw Object.assign(new Error("Couldn't fetch this paper's details from arXiv, DataCite or Semantic Scholar. See the status chips and connection log below."), {status: call.status});
+  const meta = ax
+    ? {id, title: ax.title, authors: ax.authors, year: yearFromArxivId(id) || ax.year, primaryClass: ax.primaryClass, journalRef: ax.journalRef, abstract: ax.abstract || (s2 && s2.abstract) || "", src}
+    : {id, title: s2.title, authors: (s2.authors || []).map(a => a.name).filter(Boolean), year: yearFromArxivId(id) || s2.year, primaryClass: "", journalRef: "", abstract: s2.abstract || "", src: "Semantic Scholar"};
+  // Conferences need no page numbers, so Semantic Scholar + Crossref are enough. DBLP is only asked when nothing good was found,
+  // or when the match is a journal article that still lacks pages or a volume.
+  const cr = await searchCrossref(meta, call);
+  let dblp = {failed: false, hits: [], tried: false};
+  let cands = buildCandidates(meta, s2, dblp, cr);
+  const best = () => cands[defaultSelection(cands)];
+  if(best().kind === "preprint" || (best().kind === "journal" && (!best().pages || !best().volume))){
+    dblp = await searchDblp(meta.title, call); dblp.tried = true;
+    cands = buildCandidates(meta, s2, dblp, cr);
+  }
+  const published = cands.filter(c => c.kind !== "preprint"), sel = best();
+  // A "gap" is a failed service that left us without something we wanted. Retries and failures that didn't matter are not reported.
+  const failedState = n => { const st = call.status[n]; return st && !["ok", "notfound"].includes(st.state) ? {name: n, state: st.state} : null; };
+  let gaps = [];
+  if(sel.kind === "preprint"){
+    if(failedState("DBLP") || failedState("Crossref")) gaps = ["Semantic Scholar", "Crossref", "DBLP"].map(failedState).filter(Boolean);
+  } else if(sel.kind === "journal" && (!sel.pages || !sel.volume)){
+    gaps = [failedState("DBLP")].filter(Boolean);
+  }
+  return {meta, cands, sel: defaultSelection(cands), status: call.status,
+          ctx: {gaps, anyPublished: published.length > 0, nStrong: published.filter(c => c.good).length}};
+}
+
+// Many papers: one arXiv request per 25 IDs, then DBLP / Crossref / Semantic Scholar per paper, two at a time with a short pause.
+async function lookupMany(ids, fetcher, log, o, onItem, onStart){
+  o = Object.assign({}, o);
+  const wait = o.sleep || sleep, call = makeCaller(fetcher, log, o), axMap = {}, axStatus = {}, results = new Array(ids.length), skip = new Set();
+  for(let s = 0; s < ids.length; s += 25){
+    if(s) await wait(o.chunkGap == null ? 3000 : o.chunkGap);
+    const chunk = ids.slice(s, s + 25);
+    const r = await call("arXiv API", `https://export.arxiv.org/api/query?id_list=${chunk.join(",")}&max_results=${chunk.length}`);
+    const feed = r ? parseArxivFeed(r.text) : {};
+    chunk.forEach(id => { axMap[id] = feed[id] || null; axStatus[id] = call.status["arXiv API"]; });
+  }
+  let next = 0;
+  const worker = async () => {
+    while(next < ids.length){
+      const k = next++, id = ids[k];
+      if(onStart) onStart(k);
+      try{ results[k] = await lookup(id, fetcher, ids.length > 1 ? (l => log(`[${id}] ${l}`)) : log, Object.assign({}, o, {axMap: {[id]: axMap[id]}, axStatus: axStatus[id], skip})); results[k].id = id; }
+      catch(e){ results[k] = {id, error: e.message, status: e.status}; }
+      if(onItem) onItem(k, results[k]);
+      await wait(o.pace == null ? 250 : o.pace);
+    }
+  };
+  await Promise.all(Array.from({length: Math.min(o.concurrency || 2, ids.length)}, worker));
+  return results;
+}
+
+if(typeof globalThis !== "undefined"){
+  globalThis.__bib = {parseArxivId, yearFromArxivId, splitName, formatAuthor, tex, accentize, protectCaps, fixPages, matchVenue, venueName,
+    parseArxivAtom, titleSim, authorOverlap, makeKey, candFromDblp, candFromS2, notionRecord, notionLabel, shortName, fullTitleName, makeKeyStyled, candFromCrossref, parseDatacite, parseArxivFeed, lookupMany, formatBib, matchVenueStrict, styleName, buildCandidates, defaultSelection, buildBib, keyFor,
+    warningsFor, provenance, lookup, ordinal, VENUES};
+}
+
+/* =====================================================================
+   UI
+   ===================================================================== */
+
+if(typeof document !== "undefined"){
+  const $ = id => document.getElementById(id);
+  const h = (tag, props, ...kids) => {
+    const el = document.createElement(tag);
+    Object.entries(props || {}).forEach(([k, v]) => { if(k === "class") el.className = v; else el.setAttribute(k, v); });
+    kids.flat().forEach(k => { if(k === null || k === undefined || k === false) return; el.append(k instanceof Node ? k : document.createTextNode(String(k))); });
+    return el;
+  };
+  const store = {
+    get(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } },
+    set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+  };
+  // fixed choices for this compact page: short name + year keys, preprints as "arXiv preprint" @article entries, LaTeX accent macros
+  const opts = {preprint: "article", accents: "latex", keyStyle: "short_year", venueStyle: (store.get("bibCompact") || {}).venueStyle === "abbr" ? "abbr" : "full"};
+  const MAX_PAPERS = 60;
+  let items = [], logLines = [], runId = 0;
+  const log = line => { logLines.push(line); $("log").textContent = logLines.join("\n"); };
+
+  function browserFetcher(timeout){
+    return async url => {
+      const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), timeout || 12000);
+      try{ const r = await fetch(url, {signal: ctl.signal}); const text = await r.text(); return {ok: r.ok, status: r.status, text}; }
+      finally{ clearTimeout(to); }
+    };
+  }
+  function probe(url){
+    const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 8000);
+    return fetch(url, {mode: "no-cors", signal: ctl.signal}).then(() => true, () => false).finally(() => clearTimeout(to));
+  }
+  async function copyText(t, msgEl){
+    let ok = false;
+    try{ await navigator.clipboard.writeText(t); ok = true; }
+    catch(e){ const ta = h("textarea", {style: "position:fixed;opacity:0"}); ta.value = t; document.body.append(ta); ta.select(); try{ ok = document.execCommand("copy"); }catch(_){} ta.remove(); }
+    msgEl.textContent = ok ? "Copied" : "Couldn't copy";
+    setTimeout(() => { if(msgEl.textContent) msgEl.textContent = ""; }, 2200);
+    return ok;
+  }
+
+  function uniqueKeys(){
+    const seen = new Set();
+    items.forEach(it => {
+      if(!it.R) return;
+      let k = keyFor(it.R.meta, it.R.cands[it.sel], opts.keyStyle);
+      if(seen.has(k)){ let n = 0; while(seen.has(k + String.fromCharCode(97 + n))) n++; k += String.fromCharCode(97 + n); }
+      seen.add(k); it.shownKey = k;
+    });
+  }
+  const bibOf = it => buildBib(it.R.meta, it.R.cands[it.sel], it.shownKey, opts);
+  const readyItems = () => { uniqueKeys(); return items.filter(it => it.R); };
+
+  const STATE_TEXT = {ratelimited: "rate limited", unreadable: "blocked or errored", unreachable: "unreachable", timeout: "timed out", error: "server error", network: "failed", skipped: "skipped after a rate limit"};
+  function renderGaps(){
+    const agg = {};
+    items.forEach(it => { if(it.R) (it.R.ctx.gaps || []).forEach(g => { const k = g.name + " " + (STATE_TEXT[g.state] || g.state); agg[k] = (agg[k] || 0) + 1; }); });
+    const keys = Object.keys(agg), box = $("gaps");
+    box.textContent = keys.length ? "Couldn't check: " + keys.map(k => k + (items.length > 1 ? ` (${agg[k]})` : "")).join(", ") : "";
+    box.hidden = !keys.length;
+  }
+  function setProgress(done, total, running, text, sub){
+    $("pw").className = "pw " + (running ? "running" : "done");
+    $("pfill").style.width = (running ? Math.max(5, Math.round(100 * done / total)) : 100) + "%";
+    const t = $("ptext"); t.textContent = ""; t.append(h("b", {}, text)); if(sub) t.append(h("span", {class: "s2"}, "  " + sub));
+  }
+
+  function label(it){
+    const c = it.R.cands[it.sel];
+    return c.kind === "preprint" ? "arXiv preprint" : `${c.v ? c.v.abbr : c.venueRaw}${c.ws ? " Workshops" : ""} ${c.year || ""}`.trim();
+  }
+  function renderItem(it){
+    const wasOpen = it.el ? it.el.open : false;
+    let node;
+    if(!it.R && !it.err){
+      node = h("details", {class: "card"}, h("summary", {style: "cursor:default"}, h("span", {class: "dot" + (it.running ? "" : " wait")}),
+        h("span", {class: "ct"}, h("b", {}, "arXiv:" + it.id), " ", h("span", {}, it.running ? "looking up…" : "waiting"))));
+      node.addEventListener("toggle", () => { node.open = false; });
+    } else if(it.err){
+      node = h("details", {class: "card", open: ""}, h("summary", {}, h("span", {class: "ct"}, h("b", {}, "arXiv:" + it.id)), h("span", {class: "badge bad"}, "failed")),
+        h("div", {class: "body"}, h("div", {class: "warn"}, it.err)));
+    } else {
+      const R = it.R, c = R.cands[it.sel], warns = warningsFor(R.meta, c, R.ctx);
+      const msg = h("span", {class: "cm"}, "");
+      const bBib = h("button", {type: "button"}, "Copy BibTeX"), bNot = h("button", {type: "button"}, "Copy Notion");
+      bBib.addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); uniqueKeys(); copyText(bibOf(it), msg); });
+      bNot.addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); uniqueKeys(); copyText(notionRecord(R.meta, c, bibOf(it)), msg); });
+      const box = h("div", {});
+      R.cands.forEach((cd, i) => {
+        const pre = cd.kind === "preprint";
+        const lab = pre ? "arXiv preprint" : `${cd.v ? cd.v.abbr : cd.venueRaw}${cd.ws ? " Workshops" : ""} ${cd.year || ""}`.trim();
+        const m2 = pre ? "Use this if you're citing the preprint itself, or nothing published was found."
+          : [h("b", {}, cd.source), ` · title ${Math.round(cd.ts * 100)}% · authors ${Math.round(cd.ov * 100)}%`, cd.pages ? ` · pages ${cd.pages}` : ""];
+        const radio = h("input", {type: "radio", name: "cand-" + it.id}); radio.checked = i === it.sel;
+        radio.addEventListener("change", () => { it.sel = i; renderItem(it); });
+        box.append(h("label", {class: "cand" + (i === it.sel ? " on" : "")}, radio, h("div", {}, h("div", {class: "t"}, lab), pre ? null : h("div", {class: "m"}, cd.title), h("div", {class: "m"}, m2))));
+      });
+      node = h("details", {class: "card"},
+        h("summary", {}, h("span", {class: "ct"}, h("b", {}, label(it)), " ", h("span", {}, R.meta.title)),
+          warns.length ? h("span", {class: "badge", title: warns.join("\n")}, "⚠ " + warns.length) : null, h("span", {class: "cb"}, msg, bBib, bNot)),
+        h("div", {class: "body"}, box, warns.map(t => h("div", {class: "warn"}, t))));
+      if(wasOpen) node.setAttribute("open", "");
+    }
+    if(it.el && it.el.parentNode) it.el.replaceWith(node); else $("items").append(node);
+    it.el = node;
+  }
+
+  function showInput(){
+    runId++;                                  // ignore anything still in flight from the last run
+    items = []; logLines = []; $("log").textContent = ""; $("items").textContent = ""; $("gaps").hidden = true;
+    $("viewRes").hidden = true; $("viewIn").hidden = false; $("q").value = ""; $("msg").textContent = ""; $("go").disabled = false; $("q").focus();
+  }
+  async function collect(input){
+    const lines = String(input || "").split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+    const ids = [], bad = [];
+    lines.forEach(l => { const id = parseArxivId(l); if(!id) bad.push(l); else if(!ids.includes(id)) ids.push(id); });
+    if(!ids.length){ $("msg").textContent = lines.length ? "No arXiv ID found. Try a link like arxiv.org/abs/2201.02609 or 2201.02609." : "Paste one or more arXiv links first."; return; }
+    if(ids.length > MAX_PAPERS) ids.length = MAX_PAPERS;
+    const my = ++runId, total = ids.length; let done = 0;
+    $("viewIn").hidden = true; $("viewRes").hidden = false; $("items").textContent = ""; logLines = []; $("log").textContent = ""; $("gaps").hidden = true;
+    items = ids.map(id => ({id, R: null, err: "", sel: 0, el: null, running: false}));
+    items.forEach(renderItem);
+    setProgress(0, total, true, `0 of ${total} done`, "fetching arXiv details");
+    const note = bad.length ? `  ${bad.length} line${bad.length > 1 ? "s" : ""} skipped` : "";
+    try{
+      const results = await lookupMany(ids, browserFetcher(12000), log, {probe}, (k, res) => {
+        if(my !== runId) return;
+        const it = items[k]; done++; it.running = false;
+        if(res.error) it.err = res.error; else { it.R = res; it.sel = res.sel; }
+        uniqueKeys(); renderItem(it); renderGaps();
+        if(done < total) setProgress(done, total, true, `${done} of ${total} done`, "still running");
+      }, k => { if(my === runId){ items[k].running = true; renderItem(items[k]); } });
+      if(my !== runId) return;
+      const failed = results.filter(r => r.error).length, ok = results.filter(r => !r.error);
+      const nPub = ok.filter(r => r.cands[r.sel].kind !== "preprint").length;
+      setProgress(total, total, false, `Done: ${total} of ${total}`, `${nPub} published, ${ok.length - nPub} preprint only${failed ? `, ${failed} failed` : ""}${note}`);
+      if(failed) document.querySelector("details.log").open = true;
+    }catch(e){ if(my === runId) setProgress(done, total, false, "Stopped", e.message || "something went wrong"); }
+  }
+
+  $("go").addEventListener("click", () => collect($("q").value));
+  $("q").addEventListener("keydown", e => { if(e.key === "Enter" && (e.metaKey || e.ctrlKey)){ e.preventDefault(); collect($("q").value); } });
+  $("back").addEventListener("click", showInput);
+  $("optVen").value = opts.venueStyle; $("optVen2").value = opts.venueStyle;
+  const onVen = e => { opts.venueStyle = e.target.value; $("optVen").value = opts.venueStyle; $("optVen2").value = opts.venueStyle; store.set("bibCompact", {venueStyle: opts.venueStyle}); };
+  $("optVen").addEventListener("change", onVen); $("optVen2").addEventListener("change", onVen);
+  // tabs: arXiv to Notion (default) / BibTeX converter
+  document.querySelectorAll(".tab").forEach(b => b.addEventListener("click", () => {
+    const f = b.dataset.tab === "b";
+    $("viewIn").hidden = f; $("viewF").hidden = !f;
+    (f ? $("fin") : $("q")).focus();
+  }));
+  function fShowInput(){ $("viewFR").hidden = true; $("viewF").hidden = false; $("fin").value = ""; $("fout").value = ""; $("fmsg").textContent = ""; $("fin").focus(); }
+  function convert(){
+    const text = $("fin").value;
+    if(!text.trim()){ $("fmsg").textContent = "Paste some BibTeX first."; return; }
+    const r = formatBib(text, opts);
+    if(!r.nEntries){ $("fmsg").textContent = "No BibTeX entries found."; return; }
+    $("fmsg").textContent = "";
+    $("fout").value = r.out;
+    const rep = $("frep"), bits = [`${r.nEntries} entries`, `${r.changes.length} changed`, `${r.nSame} already ${opts.venueStyle === "abbr" ? "abbreviated" : "full"}`];
+    if(r.nPre) bits.push(`${r.nPre} preprints untouched`);
+    let tip = r.changes.map(c => `${c.key}: ${c.from} \u2192 ${c.to}`).join("\n");
+    rep.className = ""; rep.textContent = bits.join(" \u00b7 ");
+    if(r.unrec.length){ rep.className = "warnl"; rep.textContent += ` \u00b7 \u26a0 ${r.unrec.length} venue${r.unrec.length > 1 ? "s" : ""} not recognised`; tip += (tip ? "\n\n" : "") + "Left as written:\n" + r.unrec.map(([n, k]) => n + (k > 1 ? "  \u00d7" + k : "")).join("\n"); }
+    rep.title = tip;
+    $("viewF").hidden = true; $("viewFR").hidden = false;
+  }
+  $("fgo").addEventListener("click", convert);
+  $("fin").addEventListener("keydown", e => { if(e.key === "Enter" && (e.metaKey || e.ctrlKey)){ e.preventDefault(); convert(); } });
+  $("fback").addEventListener("click", fShowInput);
+  $("fcopy").addEventListener("click", async () => {
+    const b = $("fcopy"), ok = await copyText($("fout").value, {});
+    b.textContent = ok ? "Copied" : "Couldn't copy";
+    setTimeout(() => { b.textContent = "Copy BibTeX"; }, 2000);
+  });
+  $("copyAll").addEventListener("click", async () => {
+    const rd = readyItems(), b = $("copyAll");
+    if(!rd.length) return;
+    const ok = await copyText(rd.map(bibOf).join("\n\n"), {});
+    b.textContent = ok ? `Copied ${rd.length}` : "Couldn't copy";
+    setTimeout(() => { b.textContent = "Copy all BibTeX"; }, 2000);
+  });
+  // Notion form under the input: load the iframe once, only when the section is open; remember open/closed
+  (function(){
+    const box = $("formbox"), wrap = $("fwrap"); let loaded = false;
+    const FORM = "https://patch-snail-595.notion.site/ebd//3f6196f998ee8015955adda226b5d07a";
+    const load = () => {
+      if(loaded) return; loaded = true;
+      const f = document.createElement("iframe");
+      f.src = FORM; f.title = "Add a paper to Notion"; f.loading = "lazy"; f.setAttribute("allowfullscreen", "");
+      f.addEventListener("load", () => wrap.classList.add("ready"));
+      wrap.append(f);
+    };
+    const saved = store.get("bibCompactForm");
+    if(saved && saved.open === false) box.removeAttribute("open");
+    if(box.open) load();
+    box.addEventListener("toggle", () => { store.set("bibCompactForm", {open: box.open}); if(box.open) load(); });
+    $("formLink").addEventListener("click", e => e.stopPropagation());
+  })();
+  const qs = new URLSearchParams(location.search).get("q");
+  if(qs){ $("q").value = qs; collect(qs); }
+}
+</script>
+</body></html>
