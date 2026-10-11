@@ -1,154 +1,128 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>arXiv to BibTeX</title>
+<title>arXiv to BibTeX (compact)</title>
 <style>
-:root{--bg:#171717;--panel:#202020;--panel2:#262626;--line:#333;--text:#ececec;--mute:#8a8a8a;
+:root{--bg:#171717;--panel:#202020;--panel2:#262626;--line:#333;--text:#ececec;--mute:#a0a0a0;
   --acc:#8aa4ff;--ok:#6fe0b5;--warn:#ffcf70;--bad:#ff8a7a}
 *{box-sizing:border-box}
-html,body{margin:0;background:var(--bg);color:var(--text);
-  font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-body{background:radial-gradient(90% 50% at 50% 0%,color-mix(in srgb,var(--acc) 12%,transparent),transparent 70%),var(--bg);min-height:100vh}
-main{max-width:780px;margin:0 auto;padding:28px 16px 60px}
-h1{font-size:22px;margin:0 0 4px;letter-spacing:-.01em}
-h2{font-size:13px;margin:26px 0 8px;color:var(--mute);text-transform:uppercase;letter-spacing:.12em;font-weight:600}
-.sub{color:var(--mute);margin:0 0 18px}
-form{display:flex;gap:8px}
-input[type=text],select{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:10px;font:inherit;padding:10px 12px}
-input[type=text]{flex:1;min-width:0}
-input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
-button{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--text);padding:10px 16px}
+html,body{margin:0;background:var(--bg);color:var(--text);font:13px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+body{padding:8px 10px 12px;min-height:100vh}
+button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--text);padding:5px 11px;white-space:nowrap}
 button:hover{border-color:#555}
 button.primary{background:var(--acc);border-color:transparent;color:#10131f;font-weight:600}
 button.primary:hover{filter:brightness(1.08)}
 button:disabled{opacity:.55;cursor:default}
-#status{min-height:22px;margin:12px 2px 0;color:var(--text)}
-#status.err{color:var(--bad)}
-.row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:10px;color:var(--mute);font-size:13px}
-.row label{display:flex;align-items:center;gap:6px}
-.row input[type=text]{padding:6px 9px;width:230px;flex:none;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
-.row select{padding:6px 9px;font-size:13px}
-textarea{width:100%;min-height:210px;resize:vertical;background:var(--panel);border:1px solid var(--line);border-radius:10px;color:var(--text);
-  font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;padding:12px;white-space:pre;overflow:auto}
-.actions{display:flex;align-items:center;gap:12px;margin-top:10px}
-.cand{display:flex;gap:10px;align-items:flex-start;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer}
-.cand.on{border-color:var(--acc)}
-.cand input{margin-top:4px;accent-color:var(--acc)}
-.cand .t{font-weight:600}
-.cand .m{color:var(--mute);font-size:13px}
-.cand .m b{color:var(--text);font-weight:500}
-.warn{background:#2a2418;border:1px solid #4a3d1e;color:var(--warn);border-radius:10px;padding:8px 12px;margin-bottom:8px;font-size:14px}
-.info{background:var(--panel);border:1px solid var(--line);color:var(--mute);border-radius:10px;padding:8px 12px;margin-bottom:8px;font-size:14px}
-details{margin-top:14px;color:var(--mute)}
-summary{cursor:pointer;color:var(--mute)}
-table{border-collapse:collapse;width:100%;margin-top:8px;font-size:13px}
-td,th{border-top:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
-th{color:var(--mute);font-weight:500}
-td:nth-child(2){word-break:break-word;color:var(--text)}
-pre{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;white-space:pre-wrap;font:12.5px/1.5 ui-monospace,Menlo,monospace;color:var(--mute)}
-.prog{margin:14px 0 2px}
-.pbar{height:9px;background:var(--panel2);border:1px solid var(--line);border-radius:99px;overflow:hidden}
+button:focus-visible,textarea:focus,select:focus{outline:2px solid var(--acc);outline-offset:1px}
+select,textarea{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:8px;font:inherit;padding:5px 8px}
+[hidden]{display:none!important}
+
+/* input view: textarea on the left, controls on the right */
+.inview,.fview{display:flex;flex-direction:column;gap:4px}
+.inview .row,.fview .row{display:flex;gap:10px;align-items:stretch}
+.inview .left,.fview .left{flex:1;min-width:0;display:flex;flex-direction:column}
+.tabs{display:flex;gap:14px;border-bottom:1px solid var(--line);margin-bottom:2px}
+.tab{background:none;border:0;border-bottom:2px solid transparent;border-radius:0;padding:0 1px 1px;font-size:14px;font-weight:600;line-height:20px;color:var(--mute);letter-spacing:-.01em;margin-bottom:-1px}
+.tab:hover{color:var(--text);border-color:transparent}
+.tab.on{color:var(--text);border-bottom-color:var(--acc)}
+#fout{width:100%;height:calc(100vh - 62px);min-height:110px;resize:none;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre;overflow:auto}
+#frep{font-size:12px;color:var(--mute);margin:0 0 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#frep.warnl{color:var(--warn)}
+.inview textarea,.fview textarea.fin{flex:1;min-height:92px;resize:none;font:12.5px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre;overflow:auto}
+.inview .right,.fview .right{display:flex;flex-direction:column;gap:8px;justify-content:space-between;width:150px}
+.inview .right label,.fview .right label{display:flex;flex-direction:column;gap:3px;color:var(--mute);font-size:12px}
+.inview .right button,.fview .right button{padding:9px 11px}
+#msg,#fmsg{color:var(--bad);min-height:16px;font-size:12px}
+
+/* results view */
+.bar{display:flex;gap:10px;align-items:center;margin-bottom:8px}
+.pw{flex:1;min-width:0}
+.pbar{height:7px;background:var(--panel2);border:1px solid var(--line);border-radius:99px;overflow:hidden}
 .pbar i{display:block;height:100%;width:0;background:var(--acc);border-radius:99px;transition:width .35s}
-.prog.running .pbar i{background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.3) 0 8px,transparent 8px 16px);background-size:22px 22px;animation:stripe .8s linear infinite}
-@keyframes stripe{to{background-position:22px 0}}
-.prog.done .pbar i{background:var(--ok)}
-.ptext{margin-top:7px;color:var(--text);font-size:14.5px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.pw.running .pbar i{background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.3) 0 7px,transparent 7px 14px);background-size:20px 20px;animation:stripe .8s linear infinite}
+@keyframes stripe{to{background-position:20px 0}}
+.pw.done .pbar i{background:var(--ok)}
+.ptext{margin-top:3px;font-size:12.5px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ptext b{font-variant-numeric:tabular-nums}
-.ptext .sub2{color:#b5b5b5;font-size:13px}
-.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--acc);margin-right:8px;animation:pulse 1s ease-in-out infinite}
+.ptext .s2{color:var(--mute)}
+#gaps{color:var(--warn);font-size:12px;margin:-2px 0 6px}
+
+details.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;margin-bottom:5px}
+details.card>summary{display:flex;align-items:center;gap:7px;padding:5px 8px;cursor:pointer;list-style:none}
+details.card>summary::-webkit-details-marker{display:none}
+details.card>summary::before{content:"\25B8";color:var(--mute);font-size:11px;width:9px}
+details.card[open]>summary::before{content:"\25BE"}
+.ct{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ct b{font-weight:600}
+.ct span{color:var(--mute)}
+.badge{font-size:11px;border-radius:99px;padding:0 7px;background:#2a2418;color:var(--warn);border:1px solid #4a3d1e}
+.badge.bad{background:#2a1c1c;color:var(--bad);border-color:#4d2b2b}
+.cb{display:flex;gap:5px;align-items:center}
+.cb button{padding:2px 8px;font-size:12px;border-radius:7px}
+.cm{color:var(--ok);font-size:12px;min-width:44px;text-align:right}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--acc);animation:pulse 1s ease-in-out infinite}
 .dot.wait{background:#666;animation:none}
 @keyframes pulse{50%{opacity:.25}}
-.item.pending>summary{color:var(--text);cursor:default}
-.chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 0}
-.chip{font-size:12.5px;border:1px solid var(--line);background:var(--panel);color:var(--mute);border-radius:999px;padding:3px 10px}
-.chip.ok{color:var(--ok)}.chip.bad{color:var(--warn);border-color:#4a3d1e}
-.tabs{display:flex;gap:6px;margin-bottom:14px}
-.tabs button{padding:7px 14px;font-size:14px}
-.tabs button.on{background:var(--acc);border-color:transparent;color:#10131f;font-weight:600}
-.opts{margin-bottom:14px}
-#q,#fin{min-height:0}
-#q{height:96px;min-height:70px}
-#fin{height:200px}
-form{flex-direction:column;gap:0}
-.item{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-bottom:8px;padding:0 12px}
-.item>summary{padding:10px 0;color:var(--text);list-style-position:outside}
-.item .sum-m{color:var(--mute);font-size:13px}
-.sumbtns{float:right;display:inline-flex;gap:8px;align-items:center;margin-left:10px}
-.nbtn{padding:3px 10px;font-size:13px;border-radius:8px}
-.nmsg{color:var(--ok);font-size:13px}
-.badge{font-size:12px;border-radius:999px;padding:1px 8px;margin-left:6px;background:#2a2418;color:var(--warn);border:1px solid #4a3d1e}
-.badge.bad{background:#2a1c1c;color:var(--bad);border-color:#4d2b2b}
-.item .body{padding:0 0 12px}
-.item .cand{background:var(--bg)}
-.keyrow{display:flex;gap:8px;align-items:center;margin:8px 0;color:var(--mute);font-size:13px}
-.keyrow input{width:240px;flex:none;padding:6px 9px;font:13px ui-monospace,Menlo,monospace}
-.rep ul{margin:6px 0 0;padding-left:20px;color:var(--mute);font-size:13px}
-[hidden]{display:none!important}
-@media(max-width:520px){form{flex-direction:column}.row input[type=text]{width:100%}}
+.body{padding:2px 8px 8px}
+.cand{display:flex;gap:8px;align-items:flex-start;background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:5px 8px;margin-bottom:4px;cursor:pointer}
+.cand.on{border-color:var(--acc)}
+.cand input{margin-top:3px;accent-color:var(--acc)}
+.cand .t{font-weight:600}
+.cand .m{color:var(--mute);font-size:12px}
+.cand .m b{color:var(--text);font-weight:500}
+.warn{background:#2a2418;border:1px solid #4a3d1e;color:var(--warn);border-radius:7px;padding:4px 8px;margin-bottom:4px;font-size:12px}
+details.log{margin-top:6px;color:var(--mute);font-size:12px}
+details.log summary{cursor:pointer}
+details.log pre{background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:6px 8px;white-space:pre-wrap;font:11.5px/1.45 ui-monospace,Menlo,monospace;margin:4px 0 0;max-height:120px;overflow:auto}
+@media(max-width:420px){.inview .row,.fview .row{flex-direction:column}.inview .right,.fview .right{width:auto;flex-direction:row;align-items:flex-end}}
 </style></head><body>
-<main>
-  <h1>arXiv to BibTeX</h1>
-  <p class="sub">Look up arXiv papers (one link per line) or reformat an existing .bib file. Everything runs in your browser.</p>
-  <nav class="tabs" role="tablist"><button type="button" data-tab="lookup" class="on">Look up arXiv</button><button type="button" data-tab="fmt">Reformat .bib</button></nav>
-  <div class="row opts">
-    <label>Venue names
-      <select id="optVen"><option value="full">Full titles</option><option value="abbr">Abbreviations</option></select>
-    </label>
-    <label class="lk">Citation key
-      <select id="optKey"><option value="short_year">Short name + year</option><option value="short">Short name</option><option value="full">Full title (CamelCase)</option><option value="author">Author + year + word</option></select>
-    </label>
-    <label class="lk">Preprint as
-      <select id="optPre"><option value="misc">@misc (eprint fields)</option><option value="article">@article (arXiv preprint)</option></select>
-    </label>
-    <label>Accents
-      <select id="optAcc"><option value="latex">LaTeX macros</option><option value="utf8">Keep UTF-8</option></select>
-    </label>
+<div id="viewIn" class="inview">
+  <div class="tabs" role="tablist"><button class="tab on" data-tab="n" role="tab" type="button">arXiv to Notion</button><button class="tab" data-tab="b" role="tab" type="button">BibTeX converter</button></div>
+  <div class="row">
+  <div class="left">
+    <textarea id="q" placeholder="arXiv links or IDs, one per line" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="arXiv links or IDs, one per line"></textarea>
   </div>
+  <div class="right">
+    <label>Venue names<select id="optVen"><option value="full">Full titles</option><option value="abbr">Abbreviations</option></select></label>
+    <button id="go" class="primary" type="button">Collect</button>
+  </div>
+  </div>
+  <div id="msg" role="status"></div>
+</div>
 
-  <section id="tabLookup">
-    <form id="f">
-      <textarea id="q" rows="3" placeholder="https://arxiv.org/abs/2201.02609&#10;2103.14030&#10;(one link or ID per line)" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="arXiv links or IDs, one per line"></textarea>
-      <div class="actions"><button id="go" class="primary" type="submit">Get BibTeX</button></div>
-    </form>
-    <div id="prog" class="prog" hidden><div class="pbar"><i id="pfill"></i></div><div class="ptext" id="ptext"></div></div>
-    <div id="status" role="status"></div>
-    <div id="chips" class="chips" hidden></div>
+<div id="viewF" class="fview" hidden>
+  <div class="tabs" role="tablist"><button class="tab" data-tab="n" role="tab" type="button">arXiv to Notion</button><button class="tab on" data-tab="b" role="tab" type="button">BibTeX converter</button></div>
+  <div class="row">
+  <div class="left">
+    <textarea id="fin" class="fin" placeholder="Paste BibTeX entries or a whole .bib file" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="BibTeX to convert"></textarea>
+  </div>
+  <div class="right">
+    <label>Venue names<select id="optVen2"><option value="full">Full titles</option><option value="abbr">Abbreviations</option></select></label>
+    <button id="fgo" class="primary" type="button">Convert</button>
+  </div>
+  </div>
+  <div id="fmsg" role="status"></div>
+</div>
 
-    <section id="result" hidden>
-      <h2>BibTeX</h2>
-      <textarea id="out" spellcheck="false" wrap="off" aria-label="BibTeX output"></textarea>
-      <div class="actions"><button id="copy" class="primary" type="button">Copy BibTeX</button><button id="copyNotion" type="button">Copy all for Notion</button><span id="copied" style="color:var(--ok)"></span><span id="copiedN" style="color:var(--ok)"></span></div>
-      <details><summary>Notion field order and formulas</summary><pre>Each paper is one line, fields joined by ¤ and line breaks inside a field written as ¶.
-Name ¤ Authors ¤ Conference ¤ Year ¤ Link ¤ Abstract ¤ BibTeX
+<div id="viewFR" hidden>
+  <div class="bar">
+    <button id="fback" type="button" title="Back to the input box and start over">&larr; New</button>
+    <div id="frep" style="flex:1;min-width:0;margin:0"></div>
+    <button id="fcopy" class="primary" type="button">Copy BibTeX</button>
+  </div>
+  <textarea id="fout" readonly spellcheck="false" aria-label="Converted BibTeX"></textarea>
+</div>
 
-In Notion, with the pasted line in a text property called Paste:
-  Name        prop("Paste").split("¤").at(0)
-  Authors     prop("Paste").split("¤").at(1)
-  Conference  prop("Paste").split("¤").at(2)
-  Year        toNumber(prop("Paste").split("¤").at(3))
-  Link        prop("Paste").split("¤").at(4)
-  Abstract    prop("Paste").split("¤").at(5)
-  BibTeX      prop("Paste").split("¤").at(6).replaceAll("¶", "\n")
-
-The Conference value is the short label your Papers database already uses (CVPR, NeurIPS, TPAMI, "arXiv preprint"), whatever the venue-name toggle says.</pre></details>
-      <h2 id="itemsHead">Check each paper</h2>
-      <div id="items"></div>
-    </section>
-
-    <details id="diag"><summary>Connection log</summary><pre id="log"></pre></details>
-  </section>
-
-  <section id="tabFmt" hidden>
-    <textarea id="fin" spellcheck="false" wrap="off" placeholder="Paste a .bib file or a few entries here" aria-label="BibTeX input"></textarea>
-    <div class="actions"><button id="fgo" class="primary" type="button">Reformat</button><span id="fstat" style="color:var(--mute)"></span></div>
-    <div id="freport"></div>
-    <h2>Result</h2>
-    <textarea id="fout" spellcheck="false" wrap="off" aria-label="Reformatted BibTeX"></textarea>
-    <div class="actions"><button id="fcopy" class="primary" type="button">Copy</button><span id="fcopied" style="color:var(--ok)"></span></div>
-  </section>
-  <noscript><p class="warn">This page needs JavaScript.</p></noscript>
-</main>
-
+<div id="viewRes" hidden>
+  <div class="bar">
+    <button id="back" type="button" title="Back to the input box and start over">&larr; New</button>
+    <div class="pw running" id="pw"><div class="pbar"><i id="pfill"></i></div><div class="ptext" id="ptext"></div></div>
+    <button id="copyAll" class="primary" type="button">Copy all BibTeX</button>
+  </div>
+  <div id="gaps" hidden></div>
+  <div id="items"></div>
+  <details class="log"><summary>Connection log</summary><pre id="log"></pre></details>
+</div>
 <script>
 "use strict";
 /* =====================================================================
@@ -850,6 +824,7 @@ if(typeof globalThis !== "undefined"){
 /* =====================================================================
    UI
    ===================================================================== */
+
 if(typeof document !== "undefined"){
   const $ = id => document.getElementById(id);
   const h = (tag, props, ...kids) => {
@@ -862,10 +837,10 @@ if(typeof document !== "undefined"){
     get(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } },
     set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
   };
-  const opts = Object.assign({preprint: "misc", accents: "latex", venueStyle: "full", keyStyle: "short_year"}, store.get("bibOpts") || {});
+  // fixed choices for this compact page: short name + year keys, preprints as "arXiv preprint" @article entries, LaTeX accent macros
+  const opts = {preprint: "article", accents: "latex", keyStyle: "short_year", venueStyle: (store.get("bibCompact") || {}).venueStyle === "abbr" ? "abbr" : "full"};
   const MAX_PAPERS = 60;
-  let items = [];          // {id, R, err, sel, key, keyEdited, el}
-  let logLines = [];
+  let items = [], logLines = [], runId = 0;
   const log = line => { logLines.push(line); $("log").textContent = logLines.join("\n"); };
 
   function browserFetcher(timeout){
@@ -875,191 +850,163 @@ if(typeof document !== "undefined"){
       finally{ clearTimeout(to); }
     };
   }
-  function probe(url){      // no-cors fetches resolve if the server answered at all, and reject only on a network-level failure
+  function probe(url){
     const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 8000);
     return fetch(url, {mode: "no-cors", signal: ctl.signal}).then(() => true, () => false).finally(() => clearTimeout(to));
   }
-  function setStatus(msg, err){ const s = $("status"); s.textContent = msg || ""; s.className = err ? "err" : ""; }
-
-  // ---------- gaps bar: only services whose failure left something missing ----------
-  const CHIP_TEXT = {ratelimited: "rate limited", unreadable: "blocked or errored", unreachable: "unreachable", timeout: "timed out", error: "server error", network: "failed", skipped: "skipped after a rate limit"};
-  function renderGaps(){
-    const box = $("chips"); box.textContent = "";
-    const agg = {};
-    items.forEach(it => { if(it.R) (it.R.ctx.gaps || []).forEach(g => { const k = g.name + "|" + g.state; (agg[k] = agg[k] || {g, n: 0}).n++; }); });
-    const keys = Object.keys(agg);
-    if(keys.length) box.append(h("span", {class: "sum-m"}, "Couldn't check:"));
-    keys.forEach(k => { const {g, n} = agg[k]; box.append(h("span", {class: "chip bad"}, `${g.name} ${CHIP_TEXT[g.state] || g.state}` + (items.length > 1 ? ` (${n} paper${n > 1 ? "s" : ""})` : ""))); });
-    box.hidden = !keys.length;
-  }
-  function setProgress(done, total, running, text, sub){
-    const pr = $("prog"); pr.hidden = false;
-    pr.className = "prog " + (running ? "running" : "done");
-    $("pfill").style.width = (running ? Math.max(5, Math.round(100 * done / total)) : 100) + "%";
-    const t = $("ptext"); t.textContent = "";
-    t.append(h("b", {}, text)); if(sub) t.append(h("span", {class: "sub2"}, sub));
-  }
-
-  // ---------- items ----------
-  function uniqueKeys(){
-    const seen = new Set();
-    items.forEach(it => {
-      if(!it.R) return;
-      const c = it.R.cands[it.sel];
-      let k = it.keyEdited && it.key ? it.key : keyFor(it.R.meta, c, opts.keyStyle);
-      if(seen.has(k)){ let n = 0; while(seen.has(k + String.fromCharCode(97 + n))) n++; k = k + String.fromCharCode(97 + n); }
-      seen.add(k); it.shownKey = k;
-    });
-  }
-  function rebuildOutput(){
-    uniqueKeys();
-    $("out").value = items.filter(it => it.R).map(it => buildBib(it.R.meta, it.R.cands[it.sel], it.shownKey, opts)).join("\n\n");
-    items.forEach(it => { if(it.keyInput && !it.keyEdited) it.keyInput.value = it.shownKey || ""; });
-  }
-  function itemLabel(it){
-    const c = it.R.cands[it.sel];
-    return c.kind === "preprint" ? "arXiv preprint" : `${c.v ? c.v.abbr : c.venueRaw}${c.ws ? " Workshops" : ""} ${c.year || ""}`.trim();
-  }
-  function renderItem(it){
-    const wasOpen = it.el ? it.el.open : items.length === 1;
-    let node;
-    if(!it.R && !it.err){
-      node = h("details", {class: "item pending"}, h("summary", {}, h("span", {class: "dot" + (it.running ? "" : " wait")}), h("b", {}, "arXiv:" + it.id), " ",
-        h("span", {class: "sum-m"}, it.running ? "looking up…" : "waiting")));
-    } else if(it.err){
-      node = h("details", {class: "item", open: ""}, h("summary", {}, h("b", {}, "arXiv:" + it.id), h("span", {class: "badge bad"}, "failed")),
-        h("div", {class: "body"}, h("div", {class: "warn"}, it.err)));
-    } else {
-      const R = it.R, c = R.cands[it.sel];
-      const warns = warningsFor(R.meta, c, R.ctx);
-      const pub = c.kind !== "preprint";
-      const box = h("div", {});
-      R.cands.forEach((cd, i) => {
-        const preprint = cd.kind === "preprint";
-        const label = preprint ? "arXiv preprint" : `${cd.v ? cd.v.abbr : cd.venueRaw}${cd.ws ? " Workshops" : ""} ${cd.year || ""}`.trim();
-        const meta2 = preprint ? "Use this if you're citing the preprint itself, or nothing published was found."
-          : [h("b", {}, cd.source), ` · title match ${Math.round(cd.ts * 100)}% · author match ${Math.round(cd.ov * 100)}%`, cd.pages ? ` · pages ${cd.pages}` : ""];
-        const radio = h("input", {type: "radio", name: "cand-" + it.id}); radio.checked = i === it.sel;
-        const row = h("label", {class: "cand" + (i === it.sel ? " on" : "")}, radio,
-          h("div", {}, h("div", {class: "t"}, label), preprint ? null : h("div", {class: "m"}, cd.title), h("div", {class: "m"}, meta2)));
-        radio.addEventListener("change", () => { it.sel = i; if(!it.keyEdited) it.key = ""; renderItem(it); rebuildOutput(); });
-        box.append(row);
-      });
-      const keyInput = h("input", {type: "text", spellcheck: "false", autocomplete: "off", "aria-label": "Citation key"});
-      keyInput.addEventListener("input", () => { it.keyEdited = true; it.key = keyInput.value.trim(); rebuildOutput(); });
-      it.keyInput = keyInput;
-      const nBtn = h("button", {type: "button", class: "nbtn", title: "Copies one line with every field, separated by ¤"}, "Copy for Notion");
-      const nMsg = h("span", {class: "nmsg"}, "");
-      nBtn.addEventListener("click", ev => { ev.preventDefault(); ev.stopPropagation(); copyText(notionRecord(R.meta, R.cands[it.sel], buildBib(R.meta, R.cands[it.sel], it.shownKey || keyFor(R.meta, R.cands[it.sel], opts.keyStyle), opts)), nMsg); });
-      const prov = h("table", {});
-      prov.append(h("tr", {}, h("th", {}, "Field"), h("th", {}, "Value"), h("th", {}, "Source")));
-      provenance(R.meta, c, opts).forEach(r => prov.append(h("tr", {}, h("td", {}, r[0]), h("td", {}, r[1] == null ? "" : r[1]), h("td", {}, r[2]))));
-      node = h("details", {class: "item"},
-        h("summary", {}, h("b", {}, itemLabel(it)), " ", h("span", {class: "sum-m"}, "· " + R.meta.title), warns.length ? h("span", {class: "badge"}, "⚠ " + warns.length) : null, h("span", {class: "sumbtns"}, nMsg, nBtn)),
-        h("div", {class: "body"}, box, warns.map(t => h("div", {class: "warn"}, t)),
-          h("div", {class: "keyrow"}, "Key", keyInput), h("details", {}, h("summary", {}, "Where each field came from"), prov)));
-      if(wasOpen) node.setAttribute("open", "");
-      keyInput.value = it.shownKey || "";
-    }
-    if(it.el && it.el.parentNode) it.el.replaceWith(node); else $("items").append(node);
-    it.el = node;
-  }
-
-  async function run(input){
-    $("result").hidden = true; $("copied").textContent = ""; $("chips").hidden = true; $("prog").hidden = true; setStatus("");
-    logLines = []; $("log").textContent = ""; $("items").textContent = ""; items = [];
-    const lines = String(input || "").split(/\r?\n/).map(x => x.trim()).filter(Boolean);
-    const ids = [], bad = [];
-    lines.forEach(l => { const id = parseArxivId(l); if(!id) bad.push(l); else if(!ids.includes(id)) ids.push(id); });
-    if(!ids.length){ setStatus(lines.length ? "Couldn't find an arXiv ID in that. Try a link like https://arxiv.org/abs/2201.02609 or just 2201.02609." : "Paste one or more arXiv links, one per line.", true); return; }
-    let note = "";
-    if(ids.length > MAX_PAPERS){ ids.length = MAX_PAPERS; note += ` Only the first ${MAX_PAPERS} were used.`; }
-    if(bad.length) note += ` Skipped ${bad.length} line${bad.length > 1 ? "s" : ""} with no arXiv ID.`;
-    const total = ids.length; let done = 0;
-    $("go").disabled = true;
-    $("itemsHead").textContent = total > 1 ? "Check each paper" : "Which version are you citing?";
-    items = ids.map(id => ({id, R: null, err: "", sel: 0, key: "", keyEdited: false, el: null, running: false}));
-    $("result").hidden = false; items.forEach(renderItem);
-    const word = total > 1 ? `${total} papers` : "1 paper";
-    setProgress(0, total, true, `Fetching arXiv details…  0 of ${total} done`);
-    try{
-      const results = await lookupMany(ids, browserFetcher(12000), log, {probe}, (k, res) => {
-        const it = items[k]; done++; it.running = false;
-        if(res.error) it.err = res.error; else { it.R = res; it.sel = res.sel; }
-        renderItem(it); rebuildOutput(); renderGaps();
-        if(done < total) setProgress(done, total, true, `${done} of ${total} done`, "still running, you can start copying finished ones");
-      }, k => { items[k].running = true; renderItem(items[k]); setProgress(done, total, true, `${done} of ${total} done`, "still running, you can start copying finished ones"); });
-      const failed = results.filter(r => r.error).length, ok = results.filter(r => !r.error);
-      const nPub = ok.filter(r => r.cands[r.sel].kind !== "preprint").length;
-      setProgress(total, total, false, `Finished: ${total} of ${total} done`, failed ? `${failed} failed` : "");
-      if(!ok.length){ setStatus(total === 1 ? results[0].error : `None of the ${total} papers could be fetched. Check the connection log.`, true); $("diag").open = true; }
-      else if(total === 1) setStatus(nPub ? "Found a published version. Check it below before you copy." : "Using the arXiv preprint. See below for details.");
-      else setStatus(`${nPub} with a published version, ${ok.length - nPub} preprint only${failed ? `, ${failed} failed` : ""}. Open each to check.`);
-      if(note) setStatus($("status").textContent + note, !ok.length);
-      if(failed) $("diag").open = true;
-    }catch(e){
-      setProgress(done, total, false, "Stopped", ""); setStatus(e.message || "Something went wrong.", true);
-    }finally{ $("go").disabled = false; }
-  }
-
-  // ---------- reformatter ----------
-  function reformat(){
-    const text = $("fin").value;
-    if(!text.trim()){ $("fout").value = ""; $("freport").textContent = ""; $("fstat").textContent = ""; return; }
-    const r = formatBib(text, opts);
-    $("fout").value = r.out;
-    $("fstat").textContent = r.nEntries ? "" : "No BibTeX entries found.";
-    const rep = $("freport"); rep.textContent = "";
-    if(!r.nEntries) return;
-    rep.append(h("div", {class: "info rep"},
-      `${r.nEntries} entries · ${r.changes.length} venue names changed · ${r.nSame} already in this style · ${r.nPre} arXiv preprints left alone`,
-      r.noYear ? ` · ${r.noYear} without a year (used current naming)` : "",
-      r.changes.length ? h("details", {}, h("summary", {}, "Show changes"), h("ul", {}, r.changes.map(c => h("li", {}, `${c.key}: ${c.from} → ${c.to}`)))) : null));
-    if(r.unrec.length) rep.append(h("div", {class: "warn rep"}, "Not recognised, left exactly as written:",
-      h("ul", {}, r.unrec.map(([n, k]) => h("li", {}, n + (k > 1 ? `  ×${k}` : ""))))));
-  }
-
-  // ---------- wiring ----------
-  $("f").addEventListener("submit", e => { e.preventDefault(); run($("q").value); });
-  $("q").addEventListener("keydown", e => { if(e.key === "Enter" && (e.metaKey || e.ctrlKey)){ e.preventDefault(); run($("q").value); } });
-  $("optKey").value = opts.keyStyle; $("optVen").value = opts.venueStyle; $("optPre").value = opts.preprint; $("optAcc").value = opts.accents;
-  const onOpt = () => { store.set("bibOpts", opts); items.forEach(it => { if(it.R) renderItem(it); }); rebuildOutput(); reformat(); };
-  $("optVen").addEventListener("change", () => { opts.venueStyle = $("optVen").value; onOpt(); });
-  $("optKey").addEventListener("change", () => { opts.keyStyle = $("optKey").value; items.forEach(it => { if(!it.keyEdited) it.key = ""; }); onOpt(); });
-  $("optPre").addEventListener("change", () => { opts.preprint = $("optPre").value; onOpt(); });
-  $("optAcc").addEventListener("change", () => { opts.accents = $("optAcc").value; onOpt(); });
   async function copyText(t, msgEl){
     let ok = false;
     try{ await navigator.clipboard.writeText(t); ok = true; }
     catch(e){ const ta = h("textarea", {style: "position:fixed;opacity:0"}); ta.value = t; document.body.append(ta); ta.select(); try{ ok = document.execCommand("copy"); }catch(_){} ta.remove(); }
     msgEl.textContent = ok ? "Copied" : "Couldn't copy";
-    setTimeout(() => { msgEl.textContent = ""; }, 2500);
+    setTimeout(() => { if(msgEl.textContent) msgEl.textContent = ""; }, 2200);
+    return ok;
   }
-  $("copyNotion").addEventListener("click", () => {
-    const lines = items.filter(it => it.R).map(it => { const c = it.R.cands[it.sel]; return notionRecord(it.R.meta, c, buildBib(it.R.meta, c, it.shownKey, opts)); });
-    copyText(lines.join("\n"), $("copiedN"));
-  });
-  const copier = (src, msg) => async () => {
-    const t = $(src).value; let ok = false;
-    try{ await navigator.clipboard.writeText(t); ok = true; }
-    catch(e){ $(src).select(); try{ ok = document.execCommand("copy"); }catch(_){} }
-    $(msg).textContent = ok ? "Copied" : "Couldn't copy. Select the text and copy it manually.";
-    setTimeout(() => { $(msg).textContent = ""; }, 2500);
-  };
-  $("copy").addEventListener("click", copier("out", "copied"));
-  $("fcopy").addEventListener("click", copier("fout", "fcopied"));
-  $("fgo").addEventListener("click", reformat);
-  $("fin").addEventListener("input", reformat);
-  function showTab(t){
-    $("tabLookup").hidden = t !== "lookup"; $("tabFmt").hidden = t !== "fmt";
-    document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === t));
-    document.querySelectorAll(".lk").forEach(l => { l.hidden = t !== "lookup"; });
-  }
-  document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => showTab(b.dataset.tab)));
-  showTab("lookup");
 
+  function uniqueKeys(){
+    const seen = new Set();
+    items.forEach(it => {
+      if(!it.R) return;
+      let k = keyFor(it.R.meta, it.R.cands[it.sel], opts.keyStyle);
+      if(seen.has(k)){ let n = 0; while(seen.has(k + String.fromCharCode(97 + n))) n++; k += String.fromCharCode(97 + n); }
+      seen.add(k); it.shownKey = k;
+    });
+  }
+  const bibOf = it => buildBib(it.R.meta, it.R.cands[it.sel], it.shownKey, opts);
+  const readyItems = () => { uniqueKeys(); return items.filter(it => it.R); };
+
+  const STATE_TEXT = {ratelimited: "rate limited", unreadable: "blocked or errored", unreachable: "unreachable", timeout: "timed out", error: "server error", network: "failed", skipped: "skipped after a rate limit"};
+  function renderGaps(){
+    const agg = {};
+    items.forEach(it => { if(it.R) (it.R.ctx.gaps || []).forEach(g => { const k = g.name + " " + (STATE_TEXT[g.state] || g.state); agg[k] = (agg[k] || 0) + 1; }); });
+    const keys = Object.keys(agg), box = $("gaps");
+    box.textContent = keys.length ? "Couldn't check: " + keys.map(k => k + (items.length > 1 ? ` (${agg[k]})` : "")).join(", ") : "";
+    box.hidden = !keys.length;
+  }
+  function setProgress(done, total, running, text, sub){
+    $("pw").className = "pw " + (running ? "running" : "done");
+    $("pfill").style.width = (running ? Math.max(5, Math.round(100 * done / total)) : 100) + "%";
+    const t = $("ptext"); t.textContent = ""; t.append(h("b", {}, text)); if(sub) t.append(h("span", {class: "s2"}, "  " + sub));
+  }
+
+  function label(it){
+    const c = it.R.cands[it.sel];
+    return c.kind === "preprint" ? "arXiv preprint" : `${c.v ? c.v.abbr : c.venueRaw}${c.ws ? " Workshops" : ""} ${c.year || ""}`.trim();
+  }
+  function renderItem(it){
+    const wasOpen = it.el ? it.el.open : false;
+    let node;
+    if(!it.R && !it.err){
+      node = h("details", {class: "card"}, h("summary", {style: "cursor:default"}, h("span", {class: "dot" + (it.running ? "" : " wait")}),
+        h("span", {class: "ct"}, h("b", {}, "arXiv:" + it.id), " ", h("span", {}, it.running ? "looking up…" : "waiting"))));
+      node.addEventListener("toggle", () => { node.open = false; });
+    } else if(it.err){
+      node = h("details", {class: "card", open: ""}, h("summary", {}, h("span", {class: "ct"}, h("b", {}, "arXiv:" + it.id)), h("span", {class: "badge bad"}, "failed")),
+        h("div", {class: "body"}, h("div", {class: "warn"}, it.err)));
+    } else {
+      const R = it.R, c = R.cands[it.sel], warns = warningsFor(R.meta, c, R.ctx);
+      const msg = h("span", {class: "cm"}, "");
+      const bBib = h("button", {type: "button"}, "Copy BibTeX"), bNot = h("button", {type: "button"}, "Copy Notion");
+      bBib.addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); uniqueKeys(); copyText(bibOf(it), msg); });
+      bNot.addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); uniqueKeys(); copyText(notionRecord(R.meta, c, bibOf(it)), msg); });
+      const box = h("div", {});
+      R.cands.forEach((cd, i) => {
+        const pre = cd.kind === "preprint";
+        const lab = pre ? "arXiv preprint" : `${cd.v ? cd.v.abbr : cd.venueRaw}${cd.ws ? " Workshops" : ""} ${cd.year || ""}`.trim();
+        const m2 = pre ? "Use this if you're citing the preprint itself, or nothing published was found."
+          : [h("b", {}, cd.source), ` · title ${Math.round(cd.ts * 100)}% · authors ${Math.round(cd.ov * 100)}%`, cd.pages ? ` · pages ${cd.pages}` : ""];
+        const radio = h("input", {type: "radio", name: "cand-" + it.id}); radio.checked = i === it.sel;
+        radio.addEventListener("change", () => { it.sel = i; renderItem(it); });
+        box.append(h("label", {class: "cand" + (i === it.sel ? " on" : "")}, radio, h("div", {}, h("div", {class: "t"}, lab), pre ? null : h("div", {class: "m"}, cd.title), h("div", {class: "m"}, m2))));
+      });
+      node = h("details", {class: "card"},
+        h("summary", {}, h("span", {class: "ct"}, h("b", {}, label(it)), " ", h("span", {}, R.meta.title)),
+          warns.length ? h("span", {class: "badge", title: warns.join("\n")}, "⚠ " + warns.length) : null, h("span", {class: "cb"}, msg, bBib, bNot)),
+        h("div", {class: "body"}, box, warns.map(t => h("div", {class: "warn"}, t))));
+      if(wasOpen) node.setAttribute("open", "");
+    }
+    if(it.el && it.el.parentNode) it.el.replaceWith(node); else $("items").append(node);
+    it.el = node;
+  }
+
+  function showInput(){
+    runId++;                                  // ignore anything still in flight from the last run
+    items = []; logLines = []; $("log").textContent = ""; $("items").textContent = ""; $("gaps").hidden = true;
+    $("viewRes").hidden = true; $("viewIn").hidden = false; $("q").value = ""; $("msg").textContent = ""; $("go").disabled = false; $("q").focus();
+  }
+  async function collect(input){
+    const lines = String(input || "").split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+    const ids = [], bad = [];
+    lines.forEach(l => { const id = parseArxivId(l); if(!id) bad.push(l); else if(!ids.includes(id)) ids.push(id); });
+    if(!ids.length){ $("msg").textContent = lines.length ? "No arXiv ID found. Try a link like arxiv.org/abs/2201.02609 or 2201.02609." : "Paste one or more arXiv links first."; return; }
+    if(ids.length > MAX_PAPERS) ids.length = MAX_PAPERS;
+    const my = ++runId, total = ids.length; let done = 0;
+    $("viewIn").hidden = true; $("viewRes").hidden = false; $("items").textContent = ""; logLines = []; $("log").textContent = ""; $("gaps").hidden = true;
+    items = ids.map(id => ({id, R: null, err: "", sel: 0, el: null, running: false}));
+    items.forEach(renderItem);
+    setProgress(0, total, true, `0 of ${total} done`, "fetching arXiv details");
+    const note = bad.length ? `  ${bad.length} line${bad.length > 1 ? "s" : ""} skipped` : "";
+    try{
+      const results = await lookupMany(ids, browserFetcher(12000), log, {probe}, (k, res) => {
+        if(my !== runId) return;
+        const it = items[k]; done++; it.running = false;
+        if(res.error) it.err = res.error; else { it.R = res; it.sel = res.sel; }
+        uniqueKeys(); renderItem(it); renderGaps();
+        if(done < total) setProgress(done, total, true, `${done} of ${total} done`, "still running");
+      }, k => { if(my === runId){ items[k].running = true; renderItem(items[k]); } });
+      if(my !== runId) return;
+      const failed = results.filter(r => r.error).length, ok = results.filter(r => !r.error);
+      const nPub = ok.filter(r => r.cands[r.sel].kind !== "preprint").length;
+      setProgress(total, total, false, `Done: ${total} of ${total}`, `${nPub} published, ${ok.length - nPub} preprint only${failed ? `, ${failed} failed` : ""}${note}`);
+      if(failed) document.querySelector("details.log").open = true;
+    }catch(e){ if(my === runId) setProgress(done, total, false, "Stopped", e.message || "something went wrong"); }
+  }
+
+  $("go").addEventListener("click", () => collect($("q").value));
+  $("q").addEventListener("keydown", e => { if(e.key === "Enter" && (e.metaKey || e.ctrlKey)){ e.preventDefault(); collect($("q").value); } });
+  $("back").addEventListener("click", showInput);
+  $("optVen").value = opts.venueStyle; $("optVen2").value = opts.venueStyle;
+  const onVen = e => { opts.venueStyle = e.target.value; $("optVen").value = opts.venueStyle; $("optVen2").value = opts.venueStyle; store.set("bibCompact", {venueStyle: opts.venueStyle}); };
+  $("optVen").addEventListener("change", onVen); $("optVen2").addEventListener("change", onVen);
+  // tabs: arXiv to Notion (default) / BibTeX converter
+  document.querySelectorAll(".tab").forEach(b => b.addEventListener("click", () => {
+    const f = b.dataset.tab === "b";
+    $("viewIn").hidden = f; $("viewF").hidden = !f;
+    (f ? $("fin") : $("q")).focus();
+  }));
+  function fShowInput(){ $("viewFR").hidden = true; $("viewF").hidden = false; $("fin").value = ""; $("fout").value = ""; $("fmsg").textContent = ""; $("fin").focus(); }
+  function convert(){
+    const text = $("fin").value;
+    if(!text.trim()){ $("fmsg").textContent = "Paste some BibTeX first."; return; }
+    const r = formatBib(text, opts);
+    if(!r.nEntries){ $("fmsg").textContent = "No BibTeX entries found."; return; }
+    $("fmsg").textContent = "";
+    $("fout").value = r.out;
+    const rep = $("frep"), bits = [`${r.nEntries} entries`, `${r.changes.length} changed`, `${r.nSame} already ${opts.venueStyle === "abbr" ? "abbreviated" : "full"}`];
+    if(r.nPre) bits.push(`${r.nPre} preprints untouched`);
+    let tip = r.changes.map(c => `${c.key}: ${c.from} \u2192 ${c.to}`).join("\n");
+    rep.className = ""; rep.textContent = bits.join(" \u00b7 ");
+    if(r.unrec.length){ rep.className = "warnl"; rep.textContent += ` \u00b7 \u26a0 ${r.unrec.length} venue${r.unrec.length > 1 ? "s" : ""} not recognised`; tip += (tip ? "\n\n" : "") + "Left as written:\n" + r.unrec.map(([n, k]) => n + (k > 1 ? "  \u00d7" + k : "")).join("\n"); }
+    rep.title = tip;
+    $("viewF").hidden = true; $("viewFR").hidden = false;
+  }
+  $("fgo").addEventListener("click", convert);
+  $("fin").addEventListener("keydown", e => { if(e.key === "Enter" && (e.metaKey || e.ctrlKey)){ e.preventDefault(); convert(); } });
+  $("fback").addEventListener("click", fShowInput);
+  $("fcopy").addEventListener("click", async () => {
+    const b = $("fcopy"), ok = await copyText($("fout").value, {});
+    b.textContent = ok ? "Copied" : "Couldn't copy";
+    setTimeout(() => { b.textContent = "Copy BibTeX"; }, 2000);
+  });
+  $("copyAll").addEventListener("click", async () => {
+    const rd = readyItems(), b = $("copyAll");
+    if(!rd.length) return;
+    const ok = await copyText(rd.map(bibOf).join("\n\n"), {});
+    b.textContent = ok ? `Copied ${rd.length}` : "Couldn't copy";
+    setTimeout(() => { b.textContent = "Copy all BibTeX"; }, 2000);
+  });
   const qs = new URLSearchParams(location.search).get("q");
-  if(qs){ $("q").value = qs; run(qs); }
+  if(qs){ $("q").value = qs; collect(qs); }
 }
 </script>
 </body></html>
