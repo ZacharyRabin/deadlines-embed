@@ -73,6 +73,9 @@ form{flex-direction:column;gap:0}
 .item{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-bottom:8px;padding:0 12px}
 .item>summary{padding:10px 0;color:var(--text);list-style-position:outside}
 .item .sum-m{color:var(--mute);font-size:13px}
+.sumbtns{float:right;display:inline-flex;gap:8px;align-items:center;margin-left:10px}
+.nbtn{padding:3px 10px;font-size:13px;border-radius:8px}
+.nmsg{color:var(--ok);font-size:13px}
 .badge{font-size:12px;border-radius:999px;padding:1px 8px;margin-left:6px;background:#2a2418;color:var(--warn);border:1px solid #4a3d1e}
 .badge.bad{background:#2a1c1c;color:var(--bad);border-color:#4d2b2b}
 .item .body{padding:0 0 12px}
@@ -114,7 +117,20 @@ form{flex-direction:column;gap:0}
     <section id="result" hidden>
       <h2>BibTeX</h2>
       <textarea id="out" spellcheck="false" wrap="off" aria-label="BibTeX output"></textarea>
-      <div class="actions"><button id="copy" class="primary" type="button">Copy BibTeX</button><span id="copied" style="color:var(--ok)"></span></div>
+      <div class="actions"><button id="copy" class="primary" type="button">Copy BibTeX</button><button id="copyNotion" type="button">Copy all for Notion</button><span id="copied" style="color:var(--ok)"></span><span id="copiedN" style="color:var(--ok)"></span></div>
+      <details><summary>Notion field order and formulas</summary><pre>Each paper is one line, fields joined by ¤ and line breaks inside a field written as ¶.
+Name ¤ Authors ¤ Conference ¤ Year ¤ Link ¤ Abstract ¤ BibTeX
+
+In Notion, with the pasted line in a text property called Paste:
+  Name        prop("Paste").split("¤").at(0)
+  Authors     prop("Paste").split("¤").at(1)
+  Conference  prop("Paste").split("¤").at(2)
+  Year        toNumber(prop("Paste").split("¤").at(3))
+  Link        prop("Paste").split("¤").at(4)
+  Abstract    prop("Paste").split("¤").at(5)
+  BibTeX      prop("Paste").split("¤").at(6).replaceAll("¶", "\n")
+
+The Conference value is the short label your Papers database already uses (CVPR, NeurIPS, TPAMI, "arXiv preprint"), whatever the venue-name toggle says.</pre></details>
       <h2 id="itemsHead">Check each paper</h2>
       <div id="items"></div>
     </section>
@@ -302,7 +318,8 @@ const ALTS = {
   acl:["Annu. Meet. Assoc. Comput. Linguist."], emnlp:["Empirical Methods in Natural Language Processing"],
   pami:["TPAMI","PAMI","IEEE TPAMI"], ijcv:["IJCV"], tip:["IEEE TIP"], tnnls:["IEEE TNNLS","TNNLS"], tmlr:["TMLR"], jmlr:["JMLR"], cviu:["CVIU"],
   csur:["ACM CSUR"], tcsvt:["IEEE TCSVT"], tmm:["IEEE TMM"], taslp:["IEEE/ACM TASLP","TASLP"]};
-VENUES.forEach(v => { v.alts = (ALTS[v.id] || []).slice(); if(ISO[v.id]){ v.alts.push(v.abbr); v.abbr = ISO[v.id]; } });
+const NOTION_LABEL = {tnnls: "IEEE TNNLS", pr: "Pattern Recognition", nn: "Neural Networks", mm: "ACM MM"};
+VENUES.forEach(v => { v.label = NOTION_LABEL[v.id] || v.abbr; v.alts = (ALTS[v.id] || []).slice(); if(ISO[v.id]){ v.alts.push(v.abbr); v.abbr = ISO[v.id]; } });
 function styleName(v, year, ws, style){
   const n = style === "abbr" ? v.abbr : v.full(year || 0);
   return ws ? n + " Workshops" : n;
@@ -443,7 +460,7 @@ function parseEntryBody(b){
   const pc = b.match(/<arxiv:primary_category[^>]*\bterm="([^"]+)"/);
   const published = one("published");
   return {title, authors, year: published ? +published.slice(0, 4) : null,
-          primaryClass: pc ? pc[1] : "", journalRef: one("arxiv:journal_ref"), doi: one("arxiv:doi")};
+          primaryClass: pc ? pc[1] : "", journalRef: one("arxiv:journal_ref"), doi: one("arxiv:doi"), abstract: one("summary")};
 }
 
 // ---------- matching ----------
@@ -570,7 +587,9 @@ function parseDatacite(txt){
   }).filter(Boolean);
   const subj = (a.subjects || []).find(x => /arxiv/i.test(x.subjectScheme || ""));
   const pc = subj && /\(([^)]+)\)\s*$/.exec(subj.subject || "");
-  return {title: String(title).replace(/\s+/g, " ").trim(), authors, year: a.publicationYear ? +a.publicationYear : null, primaryClass: pc ? pc[1] : ""};
+  const ab = (a.descriptions || []).find(d => /abstract/i.test(d.descriptionType || ""));
+  return {title: String(title).replace(/\s+/g, " ").trim(), authors, year: a.publicationYear ? +a.publicationYear : null, primaryClass: pc ? pc[1] : "",
+          abstract: ab && ab.description ? String(ab.description).replace(/\s+/g, " ").trim() : ""};
 }
 const SRC_RANK = {"DBLP": 0, "Crossref": 1, "Semantic Scholar": 2};
 function buildCandidates(meta, s2, dblp, cr){
@@ -682,6 +701,23 @@ function provenance(meta, c, opts){
   return rows;
 }
 
+// ---------- one-line record for pasting into Notion ----------
+// Fields in order: Name, Authors, Conference, Year, Link, Abstract, BibTeX. Separator is the currency sign (U+00A4), which almost never
+// appears in papers; line breaks inside a field are written as the pilcrow (U+00B6). Both characters are stripped from the data itself.
+const NOTION_SEP = "¤", NOTION_NL = "¶";
+function notionLabel(meta, c){
+  if(c.kind === "preprint") return "arXiv preprint";
+  const base = c.v ? c.v.label + (c.kind === "conf" && c.ws && c.v.ws ? " Workshops" : "") : (c.venueRaw || "arXiv preprint");
+  return base.replace(/[,¤]/g, " ").replace(/\s+/g, " ").trim();      // a comma would split a multi-select value
+}
+function notionRecord(meta, c, bib){
+  const pub = c.kind !== "preprint";
+  const clean = x => String(x == null ? "" : x).replace(/[¤¶]/g, " ").replace(/\s+/g, " ").trim();
+  const authors = (pub && c.authors && c.authors.length ? c.authors : meta.authors).map(a => clean(a).replace(/\s+\d{4}$/, "")).join(", ");
+  return [clean(pub ? c.title : meta.title), authors, notionLabel(meta, c), (pub && c.year) || meta.year || "", "https://arxiv.org/abs/" + meta.id,
+          clean(meta.abstract), String(bib).replace(/\r?\n/g, NOTION_NL).replace(/¤/g, " ")].join(NOTION_SEP);
+}
+
 // ---------- network orchestration (fetcher, cache, probe, delays are injectable for tests) ----------
 // Every call retries on rate limits, server errors, timeouts and network errors. A 404 is an answer ("not indexed"), never retried.
 // If a request dies at the network level, o.probe(url) tells "server answered but the browser couldn't read it" (typically an error
@@ -740,7 +776,7 @@ async function searchCrossref(meta, call){
 }
 async function lookup(id, fetcher, log, o){
   const call = makeCaller(fetcher, log, o);
-  const S2F = "title,year,venue,publicationVenue,externalIds,authors.name,journal";
+  const S2F = "title,year,venue,publicationVenue,externalIds,authors.name,journal,abstract";
   const s2p = call("Semantic Scholar", `https://api.semanticscholar.org/graph/v1/paper/ARXIV:${id}?fields=${S2F}`);
   let ax = null, src = "arXiv API";
   if(o && o.axMap){ ax = o.axMap[id] || null; if(o.axStatus) call.status["arXiv API"] = o.axStatus; }     // batch: already fetched in one request
@@ -754,8 +790,8 @@ async function lookup(id, fetcher, log, o){
   }
   if(!ax && !s2) throw Object.assign(new Error("Couldn't fetch this paper's details from arXiv, DataCite or Semantic Scholar. See the status chips and connection log below."), {status: call.status});
   const meta = ax
-    ? {id, title: ax.title, authors: ax.authors, year: yearFromArxivId(id) || ax.year, primaryClass: ax.primaryClass, journalRef: ax.journalRef, src}
-    : {id, title: s2.title, authors: (s2.authors || []).map(a => a.name).filter(Boolean), year: yearFromArxivId(id) || s2.year, primaryClass: "", journalRef: "", src: "Semantic Scholar"};
+    ? {id, title: ax.title, authors: ax.authors, year: yearFromArxivId(id) || ax.year, primaryClass: ax.primaryClass, journalRef: ax.journalRef, abstract: ax.abstract || (s2 && s2.abstract) || "", src}
+    : {id, title: s2.title, authors: (s2.authors || []).map(a => a.name).filter(Boolean), year: yearFromArxivId(id) || s2.year, primaryClass: "", journalRef: "", abstract: s2.abstract || "", src: "Semantic Scholar"};
   // Conferences need no page numbers, so Semantic Scholar + Crossref are enough. DBLP is only asked when nothing good was found,
   // or when the match is a journal article that still lacks pages or a volume.
   const cr = await searchCrossref(meta, call);
@@ -807,7 +843,7 @@ async function lookupMany(ids, fetcher, log, o, onItem, onStart){
 
 if(typeof globalThis !== "undefined"){
   globalThis.__bib = {parseArxivId, yearFromArxivId, splitName, formatAuthor, tex, accentize, protectCaps, fixPages, matchVenue, venueName,
-    parseArxivAtom, titleSim, authorOverlap, makeKey, candFromDblp, candFromS2, shortName, fullTitleName, makeKeyStyled, candFromCrossref, parseDatacite, parseArxivFeed, lookupMany, formatBib, matchVenueStrict, styleName, buildCandidates, defaultSelection, buildBib, keyFor,
+    parseArxivAtom, titleSim, authorOverlap, makeKey, candFromDblp, candFromS2, notionRecord, notionLabel, shortName, fullTitleName, makeKeyStyled, candFromCrossref, parseDatacite, parseArxivFeed, lookupMany, formatBib, matchVenueStrict, styleName, buildCandidates, defaultSelection, buildBib, keyFor,
     warningsFor, provenance, lookup, ordinal, VENUES};
 }
 
@@ -912,11 +948,14 @@ if(typeof document !== "undefined"){
       const keyInput = h("input", {type: "text", spellcheck: "false", autocomplete: "off", "aria-label": "Citation key"});
       keyInput.addEventListener("input", () => { it.keyEdited = true; it.key = keyInput.value.trim(); rebuildOutput(); });
       it.keyInput = keyInput;
+      const nBtn = h("button", {type: "button", class: "nbtn", title: "Copies one line with every field, separated by ¤"}, "Copy for Notion");
+      const nMsg = h("span", {class: "nmsg"}, "");
+      nBtn.addEventListener("click", ev => { ev.preventDefault(); ev.stopPropagation(); copyText(notionRecord(R.meta, R.cands[it.sel], buildBib(R.meta, R.cands[it.sel], it.shownKey || keyFor(R.meta, R.cands[it.sel], opts.keyStyle), opts)), nMsg); });
       const prov = h("table", {});
       prov.append(h("tr", {}, h("th", {}, "Field"), h("th", {}, "Value"), h("th", {}, "Source")));
       provenance(R.meta, c, opts).forEach(r => prov.append(h("tr", {}, h("td", {}, r[0]), h("td", {}, r[1] == null ? "" : r[1]), h("td", {}, r[2]))));
       node = h("details", {class: "item"},
-        h("summary", {}, h("b", {}, itemLabel(it)), " ", h("span", {class: "sum-m"}, "· " + R.meta.title), warns.length ? h("span", {class: "badge"}, "⚠ " + warns.length) : null),
+        h("summary", {}, h("b", {}, itemLabel(it)), " ", h("span", {class: "sum-m"}, "· " + R.meta.title), warns.length ? h("span", {class: "badge"}, "⚠ " + warns.length) : null, h("span", {class: "sumbtns"}, nMsg, nBtn)),
         h("div", {class: "body"}, box, warns.map(t => h("div", {class: "warn"}, t)),
           h("div", {class: "keyrow"}, "Key", keyInput), h("details", {}, h("summary", {}, "Where each field came from"), prov)));
       if(wasOpen) node.setAttribute("open", "");
@@ -989,6 +1028,17 @@ if(typeof document !== "undefined"){
   $("optKey").addEventListener("change", () => { opts.keyStyle = $("optKey").value; items.forEach(it => { if(!it.keyEdited) it.key = ""; }); onOpt(); });
   $("optPre").addEventListener("change", () => { opts.preprint = $("optPre").value; onOpt(); });
   $("optAcc").addEventListener("change", () => { opts.accents = $("optAcc").value; onOpt(); });
+  async function copyText(t, msgEl){
+    let ok = false;
+    try{ await navigator.clipboard.writeText(t); ok = true; }
+    catch(e){ const ta = h("textarea", {style: "position:fixed;opacity:0"}); ta.value = t; document.body.append(ta); ta.select(); try{ ok = document.execCommand("copy"); }catch(_){} ta.remove(); }
+    msgEl.textContent = ok ? "Copied" : "Couldn't copy";
+    setTimeout(() => { msgEl.textContent = ""; }, 2500);
+  }
+  $("copyNotion").addEventListener("click", () => {
+    const lines = items.filter(it => it.R).map(it => { const c = it.R.cands[it.sel]; return notionRecord(it.R.meta, c, buildBib(it.R.meta, c, it.shownKey, opts)); });
+    copyText(lines.join("\n"), $("copiedN"));
+  });
   const copier = (src, msg) => async () => {
     const t = $(src).value; let ok = false;
     try{ await navigator.clipboard.writeText(t); ok = true; }
