@@ -89,7 +89,15 @@ details.formbox .fl:hover{text-decoration:underline}
 .fwrap .fload{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--mute);font-size:12.5px;animation:pulse 1.2s ease-in-out infinite;pointer-events:none}
 .fwrap.ready .fload{display:none}
 @media(max-width:420px){.inview .row,.fview .row{flex-direction:column}.inview .right,.fview .right{width:auto;flex-direction:row;align-items:flex-end}}
+#nwrap{display:flex;flex-direction:column}
+#viewRes:not([hidden]){display:contents}
+#viewIn{order:0}#viewF,#viewFR{order:0}
+#viewRes>.bar{order:1}#viewRes>#gaps{order:2}#viewRes>#items{order:3}
+#formbox{order:4}
+#viewRes>details.log{order:5}
+#formbox[hidden]{display:none}
 </style></head><body>
+<div id="nwrap">
 <div id="viewIn" class="inview">
   <div class="tabs" role="tablist"><button class="tab on" data-tab="n" role="tab" type="button">arXiv to Notion</button><button class="tab" data-tab="b" role="tab" type="button">BibTeX converter</button></div>
   <div class="row">
@@ -102,10 +110,6 @@ details.formbox .fl:hover{text-decoration:underline}
   </div>
   </div>
   <div id="msg" role="status"></div>
-  <details class="formbox" id="formbox" open>
-    <summary>Add a paper by hand<a class="fl" id="formLink" href="https://patch-snail-595.notion.site/3f6196f998ee8015955adda226b5d07a" target="_blank" rel="noopener" title="Open the form in its own tab">Open in new tab &#8599;</a></summary>
-    <div class="fwrap" id="fwrap"><div class="fload">Loading form&hellip;</div></div>
-  </details>
 </div>
 
 <div id="viewF" class="fview" hidden>
@@ -140,6 +144,11 @@ details.formbox .fl:hover{text-decoration:underline}
   <div id="gaps" hidden></div>
   <div id="items"></div>
   <details class="log"><summary>Connection log</summary><pre id="log"></pre></details>
+</div>
+  <details class="formbox" id="formbox" open>
+  <summary>Add a paper by hand<a class="fl" id="formLink" href="https://patch-snail-595.notion.site/3f6196f998ee8015955adda226b5d07a" target="_blank" rel="noopener" title="Open the form in its own tab">Open in new tab &#8599;</a></summary>
+  <div class="fwrap" id="fwrap"><div class="fload">Loading form&hellip;</div></div>
+</details>
 </div>
 <script>
 "use strict";
@@ -989,7 +998,7 @@ if(typeof document !== "undefined"){
   // tabs: arXiv to Notion (default) / BibTeX converter
   document.querySelectorAll(".tab").forEach(b => b.addEventListener("click", () => {
     const f = b.dataset.tab === "b";
-    $("viewIn").hidden = f; $("viewF").hidden = !f;
+    $("viewIn").hidden = f; $("viewF").hidden = !f; $("formbox").hidden = f;
     (f ? $("fin") : $("q")).focus();
   }));
   function fShowInput(){ $("viewFR").hidden = true; $("viewF").hidden = false; $("fin").value = ""; $("fout").value = ""; $("fmsg").textContent = ""; $("fin").focus(); }
