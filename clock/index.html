@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Date and Time</title>
+<style>
+  :root {
+    --bg: transparent;
+    --fg: #1f2328;
+    --muted: #6b7280;
+    --accent: #2563eb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --fg: #e6e6e6; --muted: #9aa0a6; --accent: #60a5fa; }
+  }
+  /* Override with ?theme=light or ?theme=dark */
+  html[data-theme="light"] { --fg: #1f2328; --muted: #6b7280; }
+  html[data-theme="dark"]  { --fg: #e6e6e6; --muted: #9aa0a6; }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%; background: var(--bg); color: var(--fg);
+    font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .wrap {
+    height: 100%; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 0.15em;
+    text-align: center; padding: 8px;
+    font-size: clamp(14px, 4.2vmin, 40px);
+  }
+  .weekday {
+    font-size: 1.1em; font-weight: 600; letter-spacing: 0.22em;
+    text-transform: uppercase; color: var(--accent);
+  }
+  .time {
+    font-size: 3.6em; font-weight: 300; line-height: 1;
+    font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
+  }
+  .time .sec { font-size: 0.45em; color: var(--muted); margin-left: 0.15em; }
+  .time .ampm { font-size: 0.35em; color: var(--muted); margin-left: 0.3em; letter-spacing: 0.1em; }
+  .date { font-size: 1.2em; color: var(--muted); margin-top: 0.2em; }
+  .rule { width: 2.5em; height: 2px; background: var(--accent); border-radius: 2px; margin: 0.5em 0 0.3em; opacity: 0.7; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="weekday" id="weekday"></div>
+  <div class="time" id="time"></div>
+  <div class="rule"></div>
+  <div class="date" id="date"></div>
+</div>
+<script>
+  // Options via URL, e.g. clock.html?h24=1&seconds=0&tz=America/New_York&theme=dark
+  var q = new URLSearchParams(location.search);
+  var tz = q.get("tz") || undefined;
+  var h24 = q.get("h24") === "1";
+  var showSec = q.get("seconds") === "1";
+  if (q.get("theme")) document.documentElement.dataset.theme = q.get("theme");
+
+  var COLORS = [
+    ["#dc2626", "#f87171"], // Sun red
+    ["#2563eb", "#60a5fa"], // Mon blue
+    ["#ea580c", "#fb923c"], // Tue orange
+    ["#16a34a", "#4ade80"], // Wed green
+    ["#9333ea", "#c084fc"], // Thu purple
+    ["#db2777", "#f472b6"], // Fri pink
+    ["#0d9488", "#2dd4bf"]  // Sat teal
+  ];
+  function applyColor(day) {
+    var dark = document.documentElement.dataset.theme
+      ? document.documentElement.dataset.theme === "dark"
+      : matchMedia("(prefers-color-scheme: dark)").matches;
+    document.documentElement.style.setProperty("--accent", COLORS[day][dark ? 1 : 0]);
+  }
+
+  var fWeekday = new Intl.DateTimeFormat(undefined, { weekday: "long", timeZone: tz });
+  var fDate = new Intl.DateTimeFormat(undefined, { month: "long", day: "numeric", year: "numeric", timeZone: tz });
+  var fHM = new Intl.DateTimeFormat("en-US", { hour: h24 ? "2-digit" : "numeric", minute: "2-digit", hour12: !h24, hourCycle: h24 ? "h23" : "h12", timeZone: tz });
+  var fSec = new Intl.DateTimeFormat("en-US", { second: "2-digit", timeZone: tz });
+
+  function tick() {
+    var now = new Date();
+    var parts = fHM.formatToParts(now);
+    var hm = "", ap = "";
+    parts.forEach(function (p) {
+      if (p.type === "dayPeriod") ap = p.value;
+      else if (p.type === "hour" || p.type === "minute" || p.type === "literal") hm += p.value;
+    });
+    var sec = String(now.getSeconds()).padStart(2, "0");
+    if (tz) sec = fSec.format(now).padStart(2, "0");
+    document.getElementById("time").innerHTML =
+      hm.trim() + (showSec ? '<span class="sec">' + sec + "</span>" : "") +
+      (ap ? '<span class="ampm">' + ap + "</span>" : "");
+    var wd = fWeekday.format(now);
+    document.getElementById("weekday").textContent = wd;
+    var idx = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"].indexOf(wd);
+    if (idx >= 0) applyColor(idx);
+    document.getElementById("date").textContent = fDate.format(now);
+  }
+  tick();
+  setInterval(tick, showSec ? 1000 : 5000);
+</script>
+</body>
+</html>
